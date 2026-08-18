@@ -1,6 +1,5 @@
 package com.rubenreysouto.hifidisplay.media
 
-import android.app.NotificationManager
 import android.content.ComponentName
 import android.content.Context
 import android.media.MediaMetadata
@@ -10,6 +9,7 @@ import android.media.session.PlaybackState
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
+import androidx.core.app.NotificationManagerCompat
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -45,7 +45,7 @@ class MediaSessionRepository private constructor(context: Context) {
     fun onResume() = refreshAccessAndListener()
 
     private fun hasAccess(): Boolean =
-        NotificationManager.getEnabledListenerPackages(appContext).contains(appContext.packageName)
+        NotificationManagerCompat.getEnabledListenerPackages(appContext).contains(appContext.packageName)
 
     private fun refreshAccessAndListener() {
         val access = hasAccess()
