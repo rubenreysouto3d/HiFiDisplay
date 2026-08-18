@@ -3,6 +3,7 @@ package com.rubenreysouto.hifidisplay.ui
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.*
@@ -10,9 +11,12 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -20,11 +24,12 @@ import androidx.compose.ui.unit.sp
 import com.rubenreysouto.hifidisplay.media.MediaUiState
 import kotlin.math.roundToLong
 
-private val Background = Color(0xFF08090A)
-private val Surface = Color(0xFF151719)
-private val PrimaryText = Color(0xFFF1EEE7)
-private val SecondaryText = Color(0xFF999C9D)
-private val Accent = Color(0xFFD8B36A)
+private val Background = Color(0xFF090B0D)
+private val Surface = Color(0xFF111519)
+private val SurfaceRaised = Color(0xFF20262B)
+private val PrimaryText = Color(0xFFF4F6F0)
+private val SecondaryText = Color(0xFF929A92)
+private val Accent = Color(0xFFD6FF7F)
 
 @Composable
 fun HiFiDisplayApp(
@@ -54,17 +59,28 @@ private fun AccessRequired(onOpenSettings: () -> Unit) {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
-        Text("HIFI DISPLAY", color = Accent, fontSize = 14.sp, letterSpacing = 5.sp)
+        Text("HI-FI DISPLAY", color = Accent, fontSize = 13.sp, fontFamily = FontFamily.Monospace, letterSpacing = 3.sp)
         Spacer(Modifier.height(24.dp))
         Text("Acceso multimedia necesario", color = PrimaryText, fontSize = 32.sp, fontWeight = FontWeight.Light)
         Spacer(Modifier.height(12.dp))
         Text(
-            "Autoriza el acceso a notificaciones para leer y controlar la sesión multimedia activa.",
+            "Android necesita que HiFiDisplay tenga acceso a notificaciones para localizar y controlar la sesión multimedia activa.",
             color = SecondaryText,
             fontSize = 16.sp,
         )
+        Spacer(Modifier.height(8.dp))
+        Text(
+            "HiFiDisplay no lee, muestra, guarda ni comparte el contenido de tus notificaciones.",
+            color = SecondaryText.copy(alpha = .72f),
+            fontSize = 13.sp,
+            fontFamily = FontFamily.Monospace,
+        )
         Spacer(Modifier.height(28.dp))
-        Button(onClick = onOpenSettings, colors = ButtonDefaults.buttonColors(containerColor = Accent, contentColor = Background)) {
+        Button(
+            onClick = onOpenSettings,
+            shape = RoundedCornerShape(4.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = Accent, contentColor = Background),
+        ) {
             Text("ABRIR AJUSTES", letterSpacing = 2.sp)
         }
     }
@@ -74,7 +90,7 @@ private fun AccessRequired(onOpenSettings: () -> Unit) {
 private fun EmptySession() {
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text("HIFI DISPLAY", color = Accent, fontSize = 14.sp, letterSpacing = 5.sp)
+            Text("HI-FI DISPLAY", color = Accent, fontSize = 13.sp, fontFamily = FontFamily.Monospace, letterSpacing = 3.sp)
             Spacer(Modifier.height(20.dp))
             Text("Esperando una sesión multimedia", color = PrimaryText, fontSize = 28.sp, fontWeight = FontWeight.Light)
             Spacer(Modifier.height(8.dp))
@@ -95,12 +111,14 @@ private fun NowPlaying(
     Row(Modifier.fillMaxSize().padding(horizontal = 36.dp, vertical = 28.dp), horizontalArrangement = Arrangement.spacedBy(40.dp)) {
         Artwork(state, Modifier.fillMaxHeight().aspectRatio(1f))
         Column(Modifier.weight(1f).fillMaxHeight()) {
-            Text(state.sourceApp ?: "Sesión multimedia", color = Accent, fontSize = 12.sp, letterSpacing = 3.sp)
+            SourceHeader(state)
             Spacer(Modifier.weight(0.7f))
             Text(state.title ?: "Título no disponible", color = PrimaryText, fontSize = 38.sp, fontWeight = FontWeight.Medium, maxLines = 2, overflow = TextOverflow.Ellipsis)
             Spacer(Modifier.height(12.dp))
             state.artist?.let { Text(it, color = SecondaryText, fontSize = 22.sp, maxLines = 1, overflow = TextOverflow.Ellipsis) }
-            state.album?.let { Text(it, color = SecondaryText.copy(alpha = .7f), fontSize = 16.sp, maxLines = 1, overflow = TextOverflow.Ellipsis) }
+            state.album?.takeUnless(String::isBlank)?.let {
+                Text(it.uppercase(), color = SecondaryText.copy(alpha = .65f), fontSize = 12.sp, fontFamily = FontFamily.Monospace, letterSpacing = 1.2.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
             Spacer(Modifier.weight(1f))
             PlayerControls(state, onPlay, onPause, onPrevious, onNext)
             Spacer(Modifier.height(20.dp))
@@ -110,13 +128,42 @@ private fun NowPlaying(
 }
 
 @Composable
+private fun SourceHeader(state: MediaUiState) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Box(
+            Modifier
+                .size(7.dp)
+                .clip(CircleShape)
+                .background(if (state.isPlaying) Accent else SecondaryText.copy(alpha = .4f))
+        )
+        Spacer(Modifier.width(9.dp))
+        Text(
+            (state.sourceApp ?: "Sesión multimedia").uppercase(),
+            color = if (state.isPlaying) Accent else SecondaryText,
+            fontSize = 11.sp,
+            fontFamily = FontFamily.Monospace,
+            letterSpacing = 1.7.sp,
+        )
+    }
+}
+
+@Composable
 private fun Artwork(state: MediaUiState, modifier: Modifier) {
-    Box(modifier.background(Surface, RoundedCornerShape(4.dp)), contentAlignment = Alignment.Center) {
+    Box(
+        modifier
+            .clip(RoundedCornerShape(8.dp))
+            .background(Brush.linearGradient(listOf(SurfaceRaised, Surface))),
+        contentAlignment = Alignment.Center,
+    ) {
         val artwork = state.artwork
         if (artwork != null) {
             Image(artwork.asImageBitmap(), null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
         } else {
-            Icon(Icons.Rounded.Album, null, tint = SecondaryText.copy(alpha = .35f), modifier = Modifier.size(112.dp))
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Icon(Icons.Rounded.Album, null, tint = SecondaryText.copy(alpha = .35f), modifier = Modifier.size(92.dp))
+                Spacer(Modifier.height(12.dp))
+                Text("SIN CARÁTULA", color = SecondaryText.copy(alpha = .65f), fontSize = 11.sp, fontFamily = FontFamily.Monospace, letterSpacing = 1.4.sp)
+            }
         }
     }
 }
@@ -133,8 +180,13 @@ private fun PlayerControls(state: MediaUiState, onPlay: () -> Unit, onPause: () 
 
 @Composable
 private fun ControlButton(icon: androidx.compose.ui.graphics.vector.ImageVector, action: () -> Unit, label: String, primary: Boolean = false) {
-    IconButton(onClick = action, modifier = Modifier.size(if (primary) 68.dp else 52.dp)) {
-        Icon(icon, label, tint = if (primary) Accent else PrimaryText, modifier = Modifier.fillMaxSize(if (primary) .85f else .72f))
+    IconButton(
+        onClick = action,
+        modifier = Modifier
+            .size(if (primary) 68.dp else 52.dp)
+            .then(if (primary) Modifier.background(Accent, CircleShape) else Modifier),
+    ) {
+        Icon(icon, label, tint = if (primary) Background else PrimaryText, modifier = Modifier.fillMaxSize(if (primary) .58f else .72f))
     }
 }
 
@@ -158,8 +210,8 @@ private fun Progress(state: MediaUiState, onSeek: (Long) -> Unit) {
         ),
     )
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-        Text(formatTime(state.positionMs), color = SecondaryText, fontSize = 12.sp)
-        Text(duration?.let(::formatTime) ?: "--:--", color = SecondaryText, fontSize = 12.sp)
+        Text(formatTime(state.positionMs), color = SecondaryText, fontSize = 11.sp, fontFamily = FontFamily.Monospace)
+        Text(duration?.let(::formatTime) ?: "--:--", color = SecondaryText, fontSize = 11.sp, fontFamily = FontFamily.Monospace)
     }
 }
 

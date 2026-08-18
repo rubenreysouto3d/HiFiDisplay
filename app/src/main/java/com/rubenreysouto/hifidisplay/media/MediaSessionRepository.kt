@@ -77,6 +77,7 @@ class MediaSessionRepository private constructor(context: Context) {
         val metadata = current?.metadata
         val playback = current?.playbackState
         val actions = playback?.actions ?: 0L
+        val sourceApp = current?.packageName?.let(::applicationLabel)
         val duration = metadata?.getLong(MediaMetadata.METADATA_KEY_DURATION)?.takeIf { it > 0L }
         val calculatedPosition = playback?.let {
             val elapsed = if (it.state == PlaybackState.STATE_PLAYING) {
@@ -88,12 +89,19 @@ class MediaSessionRepository private constructor(context: Context) {
         _state.value = MediaUiState(
             hasNotificationAccess = access,
             hasActiveSession = current != null,
-            title = metadata?.getString(MediaMetadata.METADATA_KEY_TITLE),
-            artist = metadata?.getString(MediaMetadata.METADATA_KEY_ARTIST),
+            title = metadata?.getString(MediaMetadata.METADATA_KEY_TITLE).present()
+                ?: metadata?.getString(MediaMetadata.METADATA_KEY_DISPLAY_TITLE).present()
+                ?: metadata?.description?.title?.toString().present(),
+            artist = metadata?.getString(MediaMetadata.METADATA_KEY_ARTIST).present()
+                ?: metadata?.getString(MediaMetadata.METADATA_KEY_ALBUM_ARTIST).present()
+                ?: metadata?.getString(MediaMetadata.METADATA_KEY_DISPLAY_SUBTITLE).present()
+                ?: metadata?.description?.subtitle?.toString().present()
+                ?: sourceApp,
             album = metadata?.getString(MediaMetadata.METADATA_KEY_ALBUM),
             artwork = metadata?.getBitmap(MediaMetadata.METADATA_KEY_ALBUM_ART)
-                ?: metadata?.getBitmap(MediaMetadata.METADATA_KEY_ART),
-            sourceApp = current?.packageName?.let(::applicationLabel),
+                ?: metadata?.getBitmap(MediaMetadata.METADATA_KEY_ART)
+                ?: metadata?.getBitmap(MediaMetadata.METADATA_KEY_DISPLAY_ICON),
+            sourceApp = sourceApp,
             positionMs = position,
             durationMs = duration,
             isPlaying = playback?.state == PlaybackState.STATE_PLAYING,
@@ -106,6 +114,8 @@ class MediaSessionRepository private constructor(context: Context) {
     }
 
     private infix fun Long.supports(action: Long) = this and action != 0L
+
+    private fun String?.present(): String? = this?.takeUnless(String::isBlank)
 
     private fun applicationLabel(packageName: String): String = try {
         val info = appContext.packageManager.getApplicationInfo(packageName, 0)
