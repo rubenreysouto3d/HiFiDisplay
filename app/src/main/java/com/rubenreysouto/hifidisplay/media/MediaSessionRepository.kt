@@ -28,6 +28,7 @@ class MediaSessionRepository private constructor(context: Context) {
     private var pinnedSourcePackage: String? = preferences.getString(PINNED_SOURCE_KEY, null)
     private var sessionErrorMessage: String? = null
     private var tickerRunning = false
+    private var sessionsListenerRegistered = false
     private val applicationLabels = mutableMapOf<String, String>()
     private val callback = object : MediaController.Callback() {
         override fun onMetadataChanged(metadata: MediaMetadata?) = publishState()
@@ -37,7 +38,7 @@ class MediaSessionRepository private constructor(context: Context) {
     private val sessionsChangedListener = MediaSessionManager.OnActiveSessionsChangedListener { refreshSessions() }
     private val ticker = object : Runnable {
         override fun run() {
-            if (controller?.playbackState?.state == PlaybackState.STATE_PLAYING) publishState()
+            if (controller.safePlaybackState()?.state == PlaybackState.STATE_PLAYING) publishState()
             if (tickerRunning) handler.postDelayed(this, 1_000L)
         }
     }
@@ -65,9 +66,13 @@ class MediaSessionRepository private constructor(context: Context) {
 
     private fun refreshAccessAndListener() {
         val access = hasAccess()
-        try { sessionManager.removeOnActiveSessionsChangedListener(sessionsChangedListener) } catch (_: Exception) { }
-        if (access) {
-            try { sessionManager.addOnActiveSessionsChangedListener(sessionsChangedListener, notificationComponent) } catch (_: SecurityException) { }
+        if (access && !sessionsListenerRegistered) {
+            sessionsListenerRegistered = runCatching {
+                sessionManager.addOnActiveSessionsChangedListener(sessionsChangedListener, notificationComponent)
+            }.isSuccess
+        } else if (!access && sessionsListenerRegistered) {
+            runCatching { sessionManager.removeOnActiveSessionsChangedListener(sessionsChangedListener) }
+            sessionsListenerRegistered = false
         }
         refreshSessions()
     }
@@ -85,6 +90,8 @@ class MediaSessionRepository private constructor(context: Context) {
         val sessionsResult = runCatching { sessionManager.getActiveSessions(notificationComponent) }
         if (sessionsResult.isFailure) {
             sessionErrorMessage = sessionsResult.exceptionOrNull()?.javaClass?.simpleName ?: "MediaSession error"
+            updateObservedControllers(emptyList())
+            controller = null
             publishState()
             return
         }
@@ -97,7 +104,7 @@ class MediaSessionRepository private constructor(context: Context) {
                 SessionCandidate(
                     id = it.sessionToken,
                     packageName = it.packageName,
-                    isPlaying = it.playbackState?.state == PlaybackState.STATE_PLAYING,
+                    isPlaying = it.safePlaybackState()?.state == PlaybackState.STATE_PLAYING,
                 )
             },
             pinnedPackageName = pinnedSourcePackage,
@@ -111,9 +118,9 @@ class MediaSessionRepository private constructor(context: Context) {
         val observedTokens = observedControllers.map { it.sessionToken }
         val sessionTokens = sessions.map { it.sessionToken }
         if (observedTokens != sessionTokens) {
-            observedControllers.forEach { it.unregisterCallback(callback) }
+            observedControllers.forEach { runCatching { it.unregisterCallback(callback) } }
             observedControllers = sessions
-            observedControllers.forEach { it.registerCallback(callback, handler) }
+            observedControllers.forEach { runCatching { it.registerCallback(callback, handler) } }
         }
     }
 
@@ -121,7 +128,7 @@ class MediaSessionRepository private constructor(context: Context) {
         val access = hasAccess()
         val current = controller
         val metadata = current?.let { runCatching { it.metadata }.getOrNull() }
-        val playback = current?.let { runCatching { it.playbackState }.getOrNull() }
+        val playback = current.safePlaybackState()
         val actions = playback?.actions ?: 0L
         val sourceApp = current?.packageName?.let(::applicationLabel)
         val duration = metadata?.getLong(MediaMetadata.METADATA_KEY_DURATION)?.takeIf { it > 0L }
@@ -166,7 +173,7 @@ class MediaSessionRepository private constructor(context: Context) {
                     MediaSourceUiState(
                         packageName = it.packageName,
                         label = applicationLabel(it.packageName),
-                        isPlaying = it.playbackState?.state == PlaybackState.STATE_PLAYING,
+                        isPlaying = it.safePlaybackState()?.state == PlaybackState.STATE_PLAYING,
                         isSelected = it.sessionToken == selectedToken,
                         isPinned = it.packageName == pinnedSourcePackage,
                     )
@@ -197,11 +204,40 @@ class MediaSessionRepository private constructor(context: Context) {
         refreshSessions()
     }
 
-    fun play() { runCatching { controller?.transportControls?.play() } }
-    fun pause() { runCatching { controller?.transportControls?.pause() } }
-    fun previous() { runCatching { controller?.transportControls?.skipToPrevious() } }
-    fun next() { runCatching { controller?.transportControls?.skipToNext() } }
-    fun seekTo(positionMs: Long) { runCatching { controller?.transportControls?.seekTo(positionMs) } }
+    fun play() = withSupportedController(Long::supportsPlay) { it.play() }
+
+    fun pause() = withSupportedController(Long::supportsPause) { it.pause() }
+
+    fun previous() = withSupportedController({ it supports PlaybackState.ACTION_SKIP_TO_PREVIOUS }) {
+        it.skipToPrevious()
+    }
+
+    fun next() = withSupportedController({ it supports PlaybackState.ACTION_SKIP_TO_NEXT }) {
+        it.skipToNext()
+    }
+
+    fun seekTo(positionMs: Long) = withSupportedController({ it supports PlaybackState.ACTION_SEEK_TO }) {
+        val duration = controller?.metadata
+            ?.getLong(MediaMetadata.METADATA_KEY_DURATION)
+            ?.takeIf { value -> value > 0L }
+        it.seekTo(SeekPositionSanitizer.sanitize(positionMs, duration))
+    }
+
+    private fun withSupportedController(
+        supportsAction: (Long) -> Boolean,
+        command: (MediaController.TransportControls) -> Unit,
+    ) {
+        val current = controller ?: return
+        runCatching {
+            val actions = current.playbackState?.actions ?: 0L
+            if (supportsAction(actions)) command(current.transportControls)
+        }
+    }
+
+    private infix fun Long.supports(action: Long) = this and action != 0L
+
+    private fun MediaController?.safePlaybackState(): PlaybackState? =
+        this?.let { runCatching { it.playbackState }.getOrNull() }
 
     companion object {
         private const val PINNED_SOURCE_KEY = "pinned_source_package"
