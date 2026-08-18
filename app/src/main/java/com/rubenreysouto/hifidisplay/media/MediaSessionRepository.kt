@@ -23,26 +23,38 @@ class MediaSessionRepository private constructor(context: Context) {
     val state: StateFlow<MediaUiState> = _state.asStateFlow()
 
     private var controller: MediaController? = null
+    private var observedControllers = emptyList<MediaController>()
+    private var tickerRunning = false
     private val callback = object : MediaController.Callback() {
         override fun onMetadataChanged(metadata: MediaMetadata?) = publishState()
-        override fun onPlaybackStateChanged(state: PlaybackState?) = publishState()
+        override fun onPlaybackStateChanged(state: PlaybackState?) = refreshSessions()
         override fun onSessionDestroyed() = refreshSessions()
     }
     private val sessionsChangedListener = MediaSessionManager.OnActiveSessionsChangedListener { refreshSessions() }
     private val ticker = object : Runnable {
         override fun run() {
             if (controller?.playbackState?.state == PlaybackState.STATE_PLAYING) publishState()
-            handler.postDelayed(this, 1_000L)
+            if (tickerRunning) handler.postDelayed(this, 1_000L)
         }
     }
 
     init {
         instance = this
         refreshAccessAndListener()
-        handler.post(ticker)
     }
 
-    fun onResume() = refreshAccessAndListener()
+    fun onResume() {
+        refreshAccessAndListener()
+        if (!tickerRunning) {
+            tickerRunning = true
+            handler.post(ticker)
+        }
+    }
+
+    fun onPause() {
+        tickerRunning = false
+        handler.removeCallbacks(ticker)
+    }
 
     private fun hasAccess(): Boolean =
         NotificationManagerCompat.getEnabledListenerPackages(appContext).contains(appContext.packageName)
@@ -63,11 +75,15 @@ class MediaSessionRepository private constructor(context: Context) {
         } else emptyList()
         val selected = sessions.firstOrNull { it.playbackState?.state == PlaybackState.STATE_PLAYING }
             ?: sessions.firstOrNull()
-        if (selected?.sessionToken != controller?.sessionToken) {
-            controller?.unregisterCallback(callback)
-            controller = selected
-            controller?.registerCallback(callback, handler)
+
+        val observedTokens = observedControllers.map { it.sessionToken }
+        val sessionTokens = sessions.map { it.sessionToken }
+        if (observedTokens != sessionTokens) {
+            observedControllers.forEach { it.unregisterCallback(callback) }
+            observedControllers = sessions
+            observedControllers.forEach { it.registerCallback(callback, handler) }
         }
+        controller = selected
         publishState()
     }
 
@@ -80,7 +96,7 @@ class MediaSessionRepository private constructor(context: Context) {
         val sourceApp = current?.packageName?.let(::applicationLabel)
         val duration = metadata?.getLong(MediaMetadata.METADATA_KEY_DURATION)?.takeIf { it > 0L }
         val calculatedPosition = playback?.let {
-            val elapsed = if (it.state == PlaybackState.STATE_PLAYING) {
+            val elapsed = if (it.state == PlaybackState.STATE_PLAYING && it.lastPositionUpdateTime > 0L) {
                 (SystemClock.elapsedRealtime() - it.lastPositionUpdateTime).coerceAtLeast(0L)
             } else 0L
             (it.position + elapsed * it.playbackSpeed).toLong().coerceAtLeast(0L)
@@ -105,8 +121,10 @@ class MediaSessionRepository private constructor(context: Context) {
             positionMs = position,
             durationMs = duration,
             isPlaying = playback?.state == PlaybackState.STATE_PLAYING,
-            canPlay = actions supports PlaybackState.ACTION_PLAY,
-            canPause = actions supports PlaybackState.ACTION_PAUSE,
+            canPlay = (actions supports PlaybackState.ACTION_PLAY) ||
+                (actions supports PlaybackState.ACTION_PLAY_PAUSE),
+            canPause = (actions supports PlaybackState.ACTION_PAUSE) ||
+                (actions supports PlaybackState.ACTION_PLAY_PAUSE),
             canSkipPrevious = actions supports PlaybackState.ACTION_SKIP_TO_PREVIOUS,
             canSkipNext = actions supports PlaybackState.ACTION_SKIP_TO_NEXT,
             canSeek = actions supports PlaybackState.ACTION_SEEK_TO,

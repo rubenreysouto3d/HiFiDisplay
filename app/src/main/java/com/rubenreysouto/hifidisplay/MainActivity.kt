@@ -44,6 +44,11 @@ class MainActivity : ComponentActivity() {
         enterImmersiveMode()
     }
 
+    override fun onPause() {
+        repository.onPause()
+        super.onPause()
+    }
+
     private fun enterImmersiveMode() {
         WindowCompat.setDecorFitsSystemWindows(window, false)
         WindowInsetsControllerCompat(window, window.decorView).apply {

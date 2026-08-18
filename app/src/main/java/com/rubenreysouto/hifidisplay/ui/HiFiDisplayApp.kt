@@ -157,7 +157,12 @@ private fun Artwork(state: MediaUiState, modifier: Modifier) {
     ) {
         val artwork = state.artwork
         if (artwork != null) {
-            Image(artwork.asImageBitmap(), null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+            Image(
+                bitmap = artwork.asImageBitmap(),
+                contentDescription = state.title?.let { "Carátula de $it" },
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop,
+            )
         } else {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Icon(Icons.Rounded.Album, null, tint = SecondaryText.copy(alpha = .35f), modifier = Modifier.size(92.dp))
@@ -170,7 +175,11 @@ private fun Artwork(state: MediaUiState, modifier: Modifier) {
 
 @Composable
 private fun PlayerControls(state: MediaUiState, onPlay: () -> Unit, onPause: () -> Unit, onPrevious: () -> Unit, onNext: () -> Unit) {
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(24.dp)) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(24.dp, Alignment.CenterHorizontally),
+    ) {
         if (state.canSkipPrevious) ControlButton(Icons.Rounded.SkipPrevious, onPrevious, "Anterior")
         if (state.isPlaying && state.canPause) ControlButton(Icons.Rounded.Pause, onPause, "Pausa", true)
         else if (!state.isPlaying && state.canPlay) ControlButton(Icons.Rounded.PlayArrow, onPlay, "Reproducir", true)
