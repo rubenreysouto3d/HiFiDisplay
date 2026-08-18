@@ -10,12 +10,12 @@ import androidx.activity.enableEdgeToEdge
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
+import androidx.activity.viewModels
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.rubenreysouto.hifidisplay.media.MediaSessionRepository
 import com.rubenreysouto.hifidisplay.ui.HiFiDisplayApp
 
 class MainActivity : ComponentActivity() {
-    private val repository by lazy { MediaSessionRepository.get(this) }
+    private val viewModel by viewModels<HiFiDisplayViewModel>()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -23,29 +23,29 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         enterImmersiveMode()
         setContent {
-            val state = repository.state.collectAsStateWithLifecycle().value
+            val state = viewModel.state.collectAsStateWithLifecycle().value
             HiFiDisplayApp(
                 state = state,
                 onOpenAccessSettings = {
                     startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
                 },
-                onPlay = repository::play,
-                onPause = repository::pause,
-                onPrevious = repository::previous,
-                onNext = repository::next,
-                onSeek = repository::seekTo,
+                onPlay = viewModel::play,
+                onPause = viewModel::pause,
+                onPrevious = viewModel::previous,
+                onNext = viewModel::next,
+                onSeek = viewModel::seekTo,
             )
         }
     }
 
     override fun onResume() {
         super.onResume()
-        repository.onResume()
+        viewModel.onResume()
         enterImmersiveMode()
     }
 
     override fun onPause() {
-        repository.onPause()
+        viewModel.onPause()
         super.onPause()
     }
 

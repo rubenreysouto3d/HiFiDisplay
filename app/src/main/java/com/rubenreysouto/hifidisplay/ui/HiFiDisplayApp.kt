@@ -22,6 +22,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.rubenreysouto.hifidisplay.media.MediaUiState
+import com.rubenreysouto.hifidisplay.media.SessionAvailability
 import kotlin.math.roundToLong
 
 private val Background = Color(0xFF090B0D)
@@ -43,11 +44,25 @@ fun HiFiDisplayApp(
 ) {
     MaterialTheme(colorScheme = darkColorScheme(background = Background, surface = Surface, primary = Accent)) {
         Surface(modifier = Modifier.fillMaxSize(), color = Background) {
-            when {
-                !state.hasNotificationAccess -> AccessRequired(onOpenAccessSettings)
-                !state.hasActiveSession -> EmptySession()
-                else -> NowPlaying(state, onPlay, onPause, onPrevious, onNext, onSeek)
+            when (state.availability) {
+                SessionAvailability.PERMISSION_REQUIRED -> AccessRequired(onOpenAccessSettings)
+                SessionAvailability.NO_SESSION -> EmptySession()
+                SessionAvailability.ERROR -> SessionError()
+                SessionAvailability.ACTIVE -> NowPlaying(state, onPlay, onPause, onPrevious, onNext, onSeek)
             }
+        }
+    }
+}
+
+@Composable
+private fun SessionError() {
+    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text("HI-FI DISPLAY", color = Accent, fontSize = 13.sp, fontFamily = FontFamily.Monospace, letterSpacing = 3.sp)
+            Spacer(Modifier.height(20.dp))
+            Text("No se pudo acceder a las sesiones", color = PrimaryText, fontSize = 28.sp, fontWeight = FontWeight.Light)
+            Spacer(Modifier.height(8.dp))
+            Text("La conexión se reintentará al volver a la aplicación", color = SecondaryText)
         }
     }
 }

@@ -8,10 +8,15 @@ HiFiDisplay is a landscape Android display and controller for the active system 
 - Notification access enabled for HiFiDisplay
 - A media app that publishes an active Android media session
 
-## Build
+## Build and test
 
 ```bash
+./gradlew :app:testDebugUnitTest
 ./gradlew :app:assembleDebug
 ```
 
 The debug APK is written to `app/build/outputs/apk/debug/app-debug.apk`.
+
+## v0.2 media core
+
+The media layer keeps session arbitration, playback capabilities, position estimation, and Android lifecycle handling separate from the Compose UI. It can automatically follow the playing session or persist a pinned source application for a future session picker.
