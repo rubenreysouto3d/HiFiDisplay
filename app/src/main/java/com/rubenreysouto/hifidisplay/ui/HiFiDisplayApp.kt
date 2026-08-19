@@ -18,7 +18,9 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -405,12 +407,67 @@ private fun PlaybackSkinLayout(
             DisplayLayoutMode.STANDARD -> tokens.contentGap
             DisplayLayoutMode.WIDE -> tokens.contentGap + 8.dp
         }
-        Row(
+        when (design) {
+            DisplayDesign.MONOLITH_GLASS -> MonolithGlassLayout(
+                state = state,
+                motion = artworkMotion,
+                playbackEffect = playbackArtworkEffect,
+                burnInOffset = burnInOffset,
+                compact = compact,
+                controlsVisible = controlsVisible,
+                artworkPressed = artworkPressed,
+                artworkScale = artworkScale,
+                metadataAlpha = metadataAlpha,
+                controlCue = controlCue,
+                artworkInteraction = artworkInteraction,
+                metadataInteraction = metadataInteraction,
+                onToggleControls = {
+                    view.performPremiumHaptic()
+                    toggleControls()
+                },
+                onInteraction = onKeepAlive,
+                onShowSources = onShowSources,
+                onShowDiagnostics = onShowDiagnostics,
+                onPlay = onPlay,
+                onPause = onPause,
+                onPrevious = onPrevious,
+                onNext = onNext,
+                onSeek = onSeek,
+            )
+
+            DisplayDesign.PRECISION_DECK -> PrecisionDeckLayout(
+                state = state,
+                motion = artworkMotion,
+                playbackEffect = playbackArtworkEffect,
+                burnInOffset = burnInOffset,
+                compact = compact,
+                controlsVisible = controlsVisible,
+                artworkPressed = artworkPressed,
+                artworkScale = artworkScale,
+                metadataAlpha = metadataAlpha,
+                controlCue = controlCue,
+                artworkInteraction = artworkInteraction,
+                metadataInteraction = metadataInteraction,
+                onToggleControls = {
+                    view.performPremiumHaptic()
+                    toggleControls()
+                },
+                onInteraction = onKeepAlive,
+                onShowSources = onShowSources,
+                onShowDiagnostics = onShowDiagnostics,
+                onPlay = onPlay,
+                onPause = onPause,
+                onPrevious = onPrevious,
+                onNext = onNext,
+                onSeek = onSeek,
+            )
+
+            else -> Row(
             Modifier
                 .fillMaxSize()
                 .offset(x = burnInOffset.first.dp, y = burnInOffset.second.dp)
                 .padding(horizontal = horizontalPadding, vertical = verticalPadding),
-        ) {
+            ) {
             if (tokens.artworkPlacement == ArtworkPlacement.LEADING) {
                 Artwork(
                     state = state,
@@ -484,6 +541,400 @@ private fun PlaybackSkinLayout(
                         ),
                 )
             }
+            }
+        }
+    }
+}
+
+@Composable
+private fun MonolithGlassLayout(
+    state: MediaUiState,
+    motion: ArtworkMotion,
+    playbackEffect: PlaybackArtworkEffect,
+    burnInOffset: Pair<Int, Int>,
+    compact: Boolean,
+    controlsVisible: Boolean,
+    artworkPressed: Boolean,
+    artworkScale: Float,
+    metadataAlpha: Float,
+    controlCue: ControlCue?,
+    artworkInteraction: MutableInteractionSource,
+    metadataInteraction: MutableInteractionSource,
+    onToggleControls: () -> Unit,
+    onInteraction: () -> Unit,
+    onShowSources: () -> Unit,
+    onShowDiagnostics: () -> Unit,
+    onPlay: () -> Unit,
+    onPause: () -> Unit,
+    onPrevious: () -> Unit,
+    onNext: () -> Unit,
+    onSeek: (Long) -> Unit,
+) {
+    val design = DisplayDesign.MONOLITH_GLASS
+    Box(
+        Modifier
+            .fillMaxSize()
+            .offset(x = burnInOffset.first.dp, y = burnInOffset.second.dp)
+            .padding(horizontal = if (compact) 16.dp else 22.dp, vertical = if (compact) 14.dp else 18.dp),
+    ) {
+        Artwork(
+            state = state,
+            design = design,
+            motion = motion,
+            playbackEffect = playbackEffect,
+            pressed = artworkPressed,
+            controlCue = null,
+            modifier = Modifier
+                .fillMaxHeight()
+                .fillMaxWidth(if (compact) .55f else .62f)
+                .graphicsLayer { scaleX = artworkScale; scaleY = artworkScale }
+                .clickable(
+                    interactionSource = artworkInteraction,
+                    indication = null,
+                    onClick = onToggleControls,
+                ),
+        )
+        Box(
+            Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.horizontalGradient(
+                        colorStops = arrayOf(
+                            0f to Color.Transparent,
+                            .34f to Color.Transparent,
+                            .55f to Background.copy(alpha = .76f),
+                            .7f to Background.copy(alpha = .97f),
+                            1f to Background,
+                        ),
+                    ),
+                ),
+        )
+        Column(
+            Modifier
+                .align(Alignment.CenterEnd)
+                .fillMaxWidth(if (compact) .55f else .52f)
+                .padding(end = if (compact) 16.dp else 34.dp, bottom = 72.dp)
+                .graphicsLayer { alpha = metadataAlpha }
+                .clickable(
+                    interactionSource = metadataInteraction,
+                    indication = null,
+                    onClick = onToggleControls,
+                ),
+            verticalArrangement = Arrangement.Center,
+        ) {
+            MonolithEditorialMetadata(state, compact)
+        }
+        Progress(
+            state = state,
+            design = design,
+            controlsVisible = controlsVisible,
+            onInteraction = onInteraction,
+            onSeek = onSeek,
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .fillMaxWidth(if (compact) .55f else .52f)
+                .padding(end = if (compact) 16.dp else 34.dp),
+        )
+        AnimatedVisibility(
+            visible = controlsVisible,
+            modifier = Modifier.align(Alignment.TopEnd).padding(top = 8.dp, end = if (compact) 16.dp else 34.dp),
+            enter = fadeIn(tween(180)) + scaleIn(tween(240), initialScale = .96f),
+            exit = fadeOut(tween(180)) + scaleOut(tween(200), targetScale = .98f),
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                SourceHeader(
+                    state = state,
+                    design = design,
+                    modifier = Modifier.widthIn(max = if (compact) 138.dp else 164.dp),
+                    onShowSources = onShowSources,
+                    onShowDiagnostics = onShowDiagnostics,
+                )
+                Spacer(Modifier.width(12.dp))
+                PlayerControls(
+                    state = state,
+                    design = design,
+                    visible = true,
+                    compact = compact,
+                    onInteraction = onInteraction,
+                    onPlay = onPlay,
+                    onPause = onPause,
+                    onPrevious = onPrevious,
+                    onNext = onNext,
+                )
+            }
+        }
+        InlineControlStateCue(
+            state = controlCue,
+            modifier = Modifier.align(Alignment.BottomStart).padding(start = 24.dp, bottom = 20.dp),
+        )
+    }
+}
+
+@Composable
+private fun MonolithEditorialMetadata(state: MediaUiState, compact: Boolean) {
+    val track = TrackCopy(
+        title = state.title?.takeUnless(String::isBlank) ?: "Título no disponible",
+        artist = state.artist?.takeUnless(String::isBlank),
+        album = state.album?.takeUnless(String::isBlank),
+    )
+    Crossfade(track, animationSpec = tween(420), label = "monolith editorial metadata") { copy ->
+        Column(Modifier.fillMaxWidth()) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.width(22.dp).height(1.dp).background(Accent.copy(alpha = .8f)))
+                Spacer(Modifier.width(10.dp))
+                Text(
+                    if (state.isPlaying) "CURRENT SELECTION" else "PLAYBACK PAUSED",
+                    color = Accent.copy(alpha = .78f),
+                    fontSize = if (compact) 7.sp else 8.sp,
+                    fontFamily = FontFamily.Monospace,
+                    letterSpacing = 1.8.sp,
+                )
+            }
+            Spacer(Modifier.height(if (compact) 14.dp else 22.dp))
+            Text(
+                copy.title,
+                color = PrimaryText,
+                fontSize = if (compact) 33.sp else 52.sp,
+                lineHeight = if (compact) 36.sp else 55.sp,
+                fontWeight = FontWeight.Light,
+                letterSpacing = (-.5).sp,
+                maxLines = if (compact) 1 else 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+            copy.artist?.let {
+                Spacer(Modifier.height(if (compact) 8.dp else 13.dp))
+                Text(
+                    it,
+                    color = PrimaryText.copy(alpha = .7f),
+                    fontSize = if (compact) 16.sp else 21.sp,
+                    fontWeight = FontWeight.Light,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            copy.album?.let {
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    it.uppercase(),
+                    color = SecondaryText.copy(alpha = .66f),
+                    fontSize = if (compact) 8.sp else 9.sp,
+                    fontFamily = FontFamily.Monospace,
+                    letterSpacing = 1.7.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun PrecisionDeckLayout(
+    state: MediaUiState,
+    motion: ArtworkMotion,
+    playbackEffect: PlaybackArtworkEffect,
+    burnInOffset: Pair<Int, Int>,
+    compact: Boolean,
+    controlsVisible: Boolean,
+    artworkPressed: Boolean,
+    artworkScale: Float,
+    metadataAlpha: Float,
+    controlCue: ControlCue?,
+    artworkInteraction: MutableInteractionSource,
+    metadataInteraction: MutableInteractionSource,
+    onToggleControls: () -> Unit,
+    onInteraction: () -> Unit,
+    onShowSources: () -> Unit,
+    onShowDiagnostics: () -> Unit,
+    onPlay: () -> Unit,
+    onPause: () -> Unit,
+    onPrevious: () -> Unit,
+    onNext: () -> Unit,
+    onSeek: (Long) -> Unit,
+) {
+    val design = DisplayDesign.PRECISION_DECK
+    val etched = SecondaryText
+    Box(
+        Modifier
+            .fillMaxSize()
+            .offset(x = burnInOffset.first.dp, y = burnInOffset.second.dp)
+            .background(Brush.linearGradient(listOf(Background, Surface.copy(alpha = .48f), Background))),
+    ) {
+        Canvas(Modifier.fillMaxSize()) {
+            val inset = if (compact) 18.dp.toPx() else 28.dp.toPx()
+            drawRect(
+                color = etched.copy(alpha = .06f),
+                topLeft = androidx.compose.ui.geometry.Offset(inset, inset),
+                size = androidx.compose.ui.geometry.Size(size.width - inset * 2, size.height - inset * 2),
+                style = Stroke(1.dp.toPx()),
+            )
+            repeat(9) { index ->
+                val x = inset + (size.width - inset * 2) * index / 8f
+                drawLine(
+                    etched.copy(alpha = if (index == 4) .045f else .022f),
+                    androidx.compose.ui.geometry.Offset(x, inset),
+                    androidx.compose.ui.geometry.Offset(x, size.height - inset),
+                    1.dp.toPx(),
+                )
+            }
+        }
+        Column(
+            Modifier.fillMaxSize().padding(
+                start = if (compact) 24.dp else 40.dp,
+                end = if (compact) 24.dp else 40.dp,
+                top = if (compact) 18.dp else 26.dp,
+                bottom = 92.dp,
+            ),
+        ) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    "HIFI / PRECISION TRANSPORT",
+                    color = Accent.copy(alpha = .82f),
+                    fontSize = if (compact) 8.sp else 9.sp,
+                    fontFamily = FontFamily.Monospace,
+                    letterSpacing = 2.sp,
+                    modifier = Modifier.weight(1f),
+                )
+                Box(Modifier.size(5.dp).clip(CircleShape).background(if (state.isPlaying) Accent else SecondaryText.copy(alpha = .36f)))
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    if (state.isPlaying) "RUN" else "STANDBY",
+                    color = if (state.isPlaying) Accent else SecondaryText,
+                    fontSize = 8.sp,
+                    fontFamily = FontFamily.Monospace,
+                    letterSpacing = 1.4.sp,
+                )
+            }
+            Spacer(Modifier.height(if (compact) 10.dp else 16.dp))
+            Row(Modifier.weight(1f).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Column(
+                    Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
+                        .graphicsLayer { alpha = metadataAlpha }
+                        .clickable(
+                            interactionSource = metadataInteraction,
+                            indication = null,
+                            onClick = onToggleControls,
+                        )
+                        .padding(end = if (compact) 22.dp else 42.dp),
+                    verticalArrangement = Arrangement.Center,
+                ) {
+                    PrecisionMetadata(
+                        TrackCopy(
+                            title = state.title?.takeUnless(String::isBlank) ?: "Título no disponible",
+                            artist = state.artist?.takeUnless(String::isBlank),
+                            album = state.album?.takeUnless(String::isBlank),
+                        ),
+                        compact,
+                    )
+                    Spacer(Modifier.height(if (compact) 16.dp else 26.dp))
+                    PrecisionTimebase(state)
+                }
+                Artwork(
+                    state = state,
+                    design = design,
+                    motion = motion,
+                    playbackEffect = playbackEffect,
+                    pressed = artworkPressed,
+                    controlCue = null,
+                    modifier = Modifier
+                        .fillMaxHeight()
+                        .aspectRatio(1f)
+                        .graphicsLayer { scaleX = artworkScale; scaleY = artworkScale }
+                        .clickable(
+                            interactionSource = artworkInteraction,
+                            indication = null,
+                            onClick = onToggleControls,
+                        ),
+                )
+            }
+        }
+        AnimatedVisibility(
+            visible = controlsVisible,
+            modifier = Modifier.align(Alignment.BottomCenter),
+            enter = fadeIn(tween(180)) + slideInVertically(tween(260)) { it / 3 },
+            exit = fadeOut(tween(160)) + slideOutVertically(tween(220)) { it / 3 },
+        ) {
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .height(86.dp)
+                    .background(Brush.verticalGradient(listOf(SurfaceRaised.copy(alpha = .82f), Surface.copy(alpha = .96f))))
+                    .border(1.dp, SecondaryText.copy(alpha = .11f))
+                    .padding(horizontal = if (compact) 24.dp else 40.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                SourceHeader(
+                    state = state,
+                    design = design,
+                    modifier = Modifier.widthIn(max = if (compact) 138.dp else 164.dp),
+                    onShowSources = onShowSources,
+                    onShowDiagnostics = onShowDiagnostics,
+                )
+                Spacer(Modifier.width(if (compact) 10.dp else 18.dp))
+                PlayerControls(
+                    state = state,
+                    design = design,
+                    visible = true,
+                    compact = compact,
+                    onInteraction = onInteraction,
+                    onPlay = onPlay,
+                    onPause = onPause,
+                    onPrevious = onPrevious,
+                    onNext = onNext,
+                )
+                Spacer(Modifier.width(if (compact) 16.dp else 28.dp))
+                Progress(
+                    state = state,
+                    design = design,
+                    controlsVisible = true,
+                    onInteraction = onInteraction,
+                    onSeek = onSeek,
+                    modifier = Modifier.weight(1f),
+                )
+            }
+        }
+        InlineControlStateCue(
+            state = controlCue,
+            modifier = Modifier.align(Alignment.TopCenter).padding(top = if (compact) 18.dp else 26.dp),
+        )
+    }
+}
+
+@Composable
+private fun PrecisionTimebase(state: MediaUiState) {
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f)) {
+            Text("ELAPSED", color = SecondaryText.copy(alpha = .62f), fontSize = 7.sp, fontFamily = FontFamily.Monospace, letterSpacing = 1.4.sp)
+            Text(formatTime(state.positionMs), color = PrimaryText.copy(alpha = .78f), fontSize = 17.sp, fontFamily = FontFamily.Monospace, letterSpacing = 1.sp)
+        }
+        Box(Modifier.width(1.dp).height(28.dp).background(SecondaryText.copy(alpha = .12f)))
+        Column(Modifier.weight(1f).padding(start = 18.dp)) {
+            Text("DURATION", color = SecondaryText.copy(alpha = .62f), fontSize = 7.sp, fontFamily = FontFamily.Monospace, letterSpacing = 1.4.sp)
+            Text(state.durationMs?.let(::formatTime) ?: "--:--", color = PrimaryText.copy(alpha = .78f), fontSize = 17.sp, fontFamily = FontFamily.Monospace, letterSpacing = 1.sp)
+        }
+    }
+}
+
+@Composable
+private fun InlineControlStateCue(state: ControlCue?, modifier: Modifier = Modifier) {
+    AnimatedVisibility(
+        visible = state?.visible == true,
+        modifier = modifier,
+        enter = fadeIn(tween(120)),
+        exit = fadeOut(tween(220)),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.size(4.dp).clip(CircleShape).background(if (state?.showsControls == true) Accent else SecondaryText))
+            Spacer(Modifier.width(7.dp))
+            Text(
+                if (state?.showsControls == true) "HUD REVEALED" else "AMBIENT MODE",
+                color = SecondaryText.copy(alpha = .72f),
+                fontSize = 7.sp,
+                fontFamily = FontFamily.Monospace,
+                letterSpacing = 1.4.sp,
+            )
         }
     }
 }
@@ -1631,46 +2082,34 @@ private fun MonolithGlassArtwork(
     haloAlpha: Float,
     modifier: Modifier,
 ) {
-    val shape = RoundedCornerShape(design.tokens.artworkCornerRadius)
+    val shape = RoundedCornerShape(if (design == DisplayDesign.MONOLITH_GLASS) 24.dp else design.tokens.artworkCornerRadius)
     Box(
         modifier
             .clip(shape)
             .background(Surface)
             .border(
                 1.dp,
-                if (haloAlpha > 0f) Accent.copy(alpha = haloAlpha) else PrimaryText.copy(alpha = .12f),
+                if (haloAlpha > 0f) Accent.copy(alpha = haloAlpha * .72f) else PrimaryText.copy(alpha = .08f),
                 shape,
             ),
     ) {
-        ArtworkVisual(state, motion)
+        if (state.artwork != null) ArtworkVisual(state, motion) else MonolithArtworkFallback(state.sourceApp)
         Box(
             Modifier
                 .fillMaxSize()
                 .background(
                     Brush.verticalGradient(
-                        listOf(Color.Transparent, Background.copy(alpha = .06f), Background.copy(alpha = .48f)),
+                        listOf(PrimaryText.copy(alpha = .035f), Color.Transparent, Background.copy(alpha = .34f)),
                     ),
                 ),
         )
         Box(
             Modifier
-                .align(Alignment.TopStart)
-                .padding(16.dp)
-                .clip(RoundedCornerShape(20.dp))
-                .background(Background.copy(alpha = .58f))
-                .border(1.dp, PrimaryText.copy(alpha = .12f), RoundedCornerShape(20.dp))
-                .padding(horizontal = 10.dp, vertical = 6.dp),
-        ) {
-            Text(
-                if (state.isPlaying) "NOW / PLAYING" else "PLAYBACK / PAUSED",
-                color = if (state.isPlaying) Accent else SecondaryText,
-                fontSize = 8.sp,
-                fontFamily = FontFamily.Monospace,
-                letterSpacing = 1.4.sp,
-            )
-        }
-        if (pressed) Box(Modifier.fillMaxSize().background(PrimaryText.copy(alpha = .035f)))
-        ControlStateCue(controlCue, Modifier.align(Alignment.BottomCenter).padding(bottom = 18.dp))
+                .fillMaxWidth()
+                .height(1.dp)
+                .background(PrimaryText.copy(alpha = .18f)),
+        )
+        if (pressed) Box(Modifier.fillMaxSize().background(PrimaryText.copy(alpha = .055f)))
     }
 }
 
@@ -1686,36 +2125,35 @@ private fun PrecisionDialArtwork(
 ) {
     val duration = state.durationMs?.takeIf { it > 0L }
     val fraction = if (duration != null) (state.positionMs.toFloat() / duration).coerceIn(0f, 1f) else 0f
-    val shape = RoundedCornerShape(design.tokens.artworkCornerRadius)
     val dialSecondary = SecondaryText
     val dialAccent = Accent
     Box(
         modifier
-            .clip(shape)
-            .background(Brush.radialGradient(listOf(SurfaceRaised.copy(alpha = .78f), Surface)))
-            .border(1.dp, SecondaryText.copy(alpha = .18f), shape)
-            .padding(18.dp),
+            .background(Color.Transparent)
+            .padding(10.dp),
         contentAlignment = Alignment.Center,
     ) {
         Canvas(Modifier.fillMaxSize()) {
-            val stroke = 2.dp.toPx()
-            drawCircle(dialSecondary.copy(alpha = .12f), style = Stroke(stroke))
+            val outer = size.minDimension * .46f
+            drawCircle(dialSecondary.copy(alpha = .11f), radius = outer, style = Stroke(1.dp.toPx()))
+            drawCircle(dialSecondary.copy(alpha = .045f), radius = outer - 10.dp.toPx(), style = Stroke(1.dp.toPx()))
             if (duration != null) {
                 drawArc(
                     color = dialAccent.copy(alpha = maxOf(.64f, haloAlpha)),
                     startAngle = -90f,
                     sweepAngle = 360f * fraction,
                     useCenter = false,
-                    style = Stroke(3.dp.toPx()),
+                    topLeft = androidx.compose.ui.geometry.Offset(center.x - outer, center.y - outer),
+                    size = androidx.compose.ui.geometry.Size(outer * 2, outer * 2),
+                    style = Stroke(2.dp.toPx()),
                 )
             }
-            repeat(24) { index ->
-                val angle = Math.toRadians((index * 15.0) - 90.0)
-                val outer = size.minDimension * .5f
-                val inner = outer - if (index % 6 == 0) 8.dp.toPx() else 4.dp.toPx()
+            repeat(48) { index ->
+                val angle = Math.toRadians((index * 7.5) - 90.0)
+                val inner = outer - if (index % 12 == 0) 9.dp.toPx() else if (index % 4 == 0) 6.dp.toPx() else 3.dp.toPx()
                 val dialCenter = center
                 drawLine(
-                    dialSecondary.copy(alpha = if (index % 6 == 0) .36f else .16f),
+                    dialSecondary.copy(alpha = if (index % 12 == 0) .42f else if (index % 4 == 0) .23f else .1f),
                     start = androidx.compose.ui.geometry.Offset(
                         dialCenter.x + kotlin.math.cos(angle).toFloat() * inner,
                         dialCenter.y + kotlin.math.sin(angle).toFloat() * inner,
@@ -1730,23 +2168,91 @@ private fun PrecisionDialArtwork(
         }
         Box(
             Modifier
-                .fillMaxSize(.82f)
-                .clip(RoundedCornerShape(2.dp))
+                .fillMaxSize(.62f)
+                .clip(RoundedCornerShape(3.dp))
                 .background(SurfaceRaised)
-                .border(1.dp, if (pressed) Accent.copy(alpha = .55f) else PrimaryText.copy(alpha = .12f), RoundedCornerShape(2.dp)),
+                .border(1.dp, if (pressed) Accent.copy(alpha = .55f) else PrimaryText.copy(alpha = .14f), RoundedCornerShape(3.dp)),
         ) {
-            ArtworkVisual(state, motion)
+            if (state.artwork != null) ArtworkVisual(state, motion) else PrecisionArtworkFallback(state.sourceApp)
             if (pressed) Box(Modifier.fillMaxSize().background(Accent.copy(alpha = .035f)))
         }
+        Row(Modifier.align(Alignment.BottomCenter).padding(bottom = 2.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text("0", color = SecondaryText.copy(alpha = .52f), fontSize = 6.sp, fontFamily = FontFamily.Monospace)
+            Spacer(Modifier.width(18.dp))
+            Text("TIMEBASE / 48", color = SecondaryText.copy(alpha = .7f), fontSize = 7.sp, fontFamily = FontFamily.Monospace, letterSpacing = 1.3.sp)
+            Spacer(Modifier.width(18.dp))
+            Text("100", color = SecondaryText.copy(alpha = .52f), fontSize = 6.sp, fontFamily = FontFamily.Monospace)
+        }
+    }
+}
+
+@Composable
+private fun MonolithArtworkFallback(sourceApp: String?) {
+    val discColor = PrimaryText.copy(alpha = .12f)
+    val grooveColor = Background.copy(alpha = .24f)
+    val accentColor = Accent.copy(alpha = .68f)
+    val fallbackBackground = Background
+    val fallbackPrimary = PrimaryText
+    Box(
+        Modifier
+            .fillMaxSize()
+            .background(Brush.linearGradient(listOf(SurfaceRaised, Surface, Background))),
+    ) {
+        Canvas(Modifier.fillMaxSize()) {
+            val radius = size.minDimension * .43f
+            val center = androidx.compose.ui.geometry.Offset(size.width * .42f, size.height * .47f)
+            drawCircle(discColor, radius, center)
+            repeat(11) { index ->
+                drawCircle(
+                    grooveColor.copy(alpha = .12f + index * .014f),
+                    radius * (.28f + index * .06f),
+                    center,
+                    style = Stroke(1f),
+                )
+            }
+            drawCircle(accentColor, radius * .18f, center)
+            drawCircle(fallbackBackground, radius * .035f, center)
+            drawLine(
+                fallbackPrimary.copy(alpha = .14f),
+                androidx.compose.ui.geometry.Offset(size.width * .08f, size.height * .9f),
+                androidx.compose.ui.geometry.Offset(size.width * .76f, size.height * .9f),
+                1.dp.toPx(),
+            )
+        }
         Text(
-            "TIMEBASE",
-            color = SecondaryText.copy(alpha = .72f),
+            sourceApp?.uppercase() ?: "MEDIA SESSION",
+            color = PrimaryText.copy(alpha = .58f),
+            fontSize = 8.sp,
+            fontFamily = FontFamily.Monospace,
+            letterSpacing = 1.7.sp,
+            modifier = Modifier.align(Alignment.BottomStart).padding(start = 28.dp, bottom = 24.dp),
+        )
+    }
+}
+
+@Composable
+private fun PrecisionArtworkFallback(sourceApp: String?) {
+    val secondary = SecondaryText
+    val accent = Accent
+    Box(
+        Modifier.fillMaxSize().background(Brush.radialGradient(listOf(SurfaceRaised, Surface))),
+        contentAlignment = Alignment.Center,
+    ) {
+        Canvas(Modifier.fillMaxSize().padding(14.dp)) {
+            drawCircle(secondary.copy(alpha = .12f), radius = size.minDimension * .34f)
+            drawCircle(secondary.copy(alpha = .18f), radius = size.minDimension * .22f, style = Stroke(1.dp.toPx()))
+            drawCircle(accent.copy(alpha = .54f), radius = size.minDimension * .08f)
+            drawLine(secondary.copy(alpha = .16f), androidx.compose.ui.geometry.Offset(center.x, 0f), androidx.compose.ui.geometry.Offset(center.x, size.height), 1.dp.toPx())
+            drawLine(secondary.copy(alpha = .16f), androidx.compose.ui.geometry.Offset(0f, center.y), androidx.compose.ui.geometry.Offset(size.width, center.y), 1.dp.toPx())
+        }
+        Text(
+            sourceApp?.uppercase() ?: "NO COVER",
+            color = SecondaryText.copy(alpha = .64f),
             fontSize = 7.sp,
             fontFamily = FontFamily.Monospace,
-            letterSpacing = 1.4.sp,
-            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 3.dp),
+            letterSpacing = 1.3.sp,
+            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 10.dp),
         )
-        ControlStateCue(controlCue, Modifier.align(Alignment.BottomCenter).padding(bottom = 22.dp))
     }
 }
 
@@ -2031,6 +2537,7 @@ private fun Progress(
     controlsVisible: Boolean,
     onInteraction: () -> Unit,
     onSeek: (Long) -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val view = LocalView.current
     val duration = state.durationMs
@@ -2041,7 +2548,7 @@ private fun Progress(
         indication = null,
         onClick = onInteraction,
     )
-    Column(Modifier.fillMaxWidth().height(64.dp).then(revealModifier)) {
+    Column(modifier.fillMaxWidth().height(64.dp).then(revealModifier)) {
         PremiumSeekBar(
             progress = progress,
             treatment = design.tokens.progressTreatment,
