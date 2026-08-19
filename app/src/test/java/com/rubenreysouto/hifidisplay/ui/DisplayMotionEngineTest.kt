@@ -35,4 +35,29 @@ class DisplayMotionEngineTest {
             resolvePlaybackArtworkVisual(PlaybackArtworkEffect.HALO, phase = 8f, isPlaying = true),
         )
     }
+
+    @Test
+    fun `pulse phase stays locked to playback position`() {
+        assertEquals(0f, resolvePlaybackEffectPhase(PlaybackArtworkEffect.PULSE, 0L))
+        assertEquals(1f, resolvePlaybackEffectPhase(PlaybackArtworkEffect.PULSE, 326L))
+        assertEquals(0f, resolvePlaybackEffectPhase(PlaybackArtworkEffect.PULSE, 652L))
+        assertEquals(.5f, resolvePlaybackEffectPhase(PlaybackArtworkEffect.PULSE, 815L))
+    }
+
+    @Test
+    fun `all continuous effects repeat from deterministic playback anchors`() {
+        val cycleLengths = mapOf(
+            PlaybackArtworkEffect.PULSE to 652L,
+            PlaybackArtworkEffect.HALO to 1_304L,
+            PlaybackArtworkEffect.DRIFT to 10_432L,
+        )
+
+        cycleLengths.forEach { (effect, cycleMs) ->
+            assertEquals(
+                resolvePlaybackEffectPhase(effect, 187L),
+                resolvePlaybackEffectPhase(effect, 187L + cycleMs),
+            )
+        }
+        assertEquals(0f, resolvePlaybackEffectPhase(PlaybackArtworkEffect.STILL, 9_999L))
+    }
 }

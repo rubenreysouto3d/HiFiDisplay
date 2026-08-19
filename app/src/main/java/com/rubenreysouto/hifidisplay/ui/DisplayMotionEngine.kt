@@ -38,3 +38,22 @@ internal fun resolvePlaybackArtworkVisual(
         PlaybackArtworkEffect.STILL -> PlaybackArtworkVisual()
     }
 }
+
+internal fun resolvePlaybackEffectPhase(
+    effect: PlaybackArtworkEffect,
+    positionMs: Long,
+): Float {
+    val halfCycleMs = when (effect) {
+        PlaybackArtworkEffect.PULSE -> 326L
+        PlaybackArtworkEffect.HALO -> 652L
+        PlaybackArtworkEffect.DRIFT -> 5_216L
+        PlaybackArtworkEffect.STILL -> return 0f
+    }
+    val cycleMs = halfCycleMs * 2L
+    val withinCycle = positionMs.coerceAtLeast(0L) % cycleMs
+    return if (withinCycle <= halfCycleMs) {
+        withinCycle.toFloat() / halfCycleMs
+    } else {
+        (cycleMs - withinCycle).toFloat() / halfCycleMs
+    }
+}

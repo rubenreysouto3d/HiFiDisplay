@@ -102,17 +102,17 @@ enum class PlaybackArtworkEffect(
     PULSE(
         storageKey = "pulse",
         displayName = "Pulse",
-        descriptor = "GENTLE CADENCE · PLAYBACK ACTIVE",
+        descriptor = "POSITION LOCK · 92 BPM BASE",
     ),
     DRIFT(
         storageKey = "drift",
         displayName = "Drift",
-        descriptor = "SLOW DEPTH · CINEMATIC MOTION",
+        descriptor = "16-BEAT DEPTH · SLOW MOTION",
     ),
     HALO(
         storageKey = "halo",
         displayName = "Halo",
-        descriptor = "STABLE COVER · BREATHING LIGHT",
+        descriptor = "2-BEAT LIGHT · STABLE COVER",
     ),
     STILL(
         storageKey = "still",

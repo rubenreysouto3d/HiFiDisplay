@@ -13,7 +13,7 @@ internal enum class ArtworkTreatment {
     REFERENCE,
     STUDIO_DECK,
     MONOLITH_GLASS,
-    PRECISION_DIAL,
+    PRECISION_FRAME,
     CRYSTAL_FLOAT,
 }
 
@@ -92,7 +92,7 @@ internal val DisplayDesign.tokens: DisplayDesignTokens
 
         DisplayDesign.PRECISION_DECK -> DisplayDesignTokens(
             artworkPlacement = ArtworkPlacement.TRAILING,
-            artworkTreatment = ArtworkTreatment.PRECISION_DIAL,
+            artworkTreatment = ArtworkTreatment.PRECISION_FRAME,
             progressTreatment = ProgressTreatment.SEGMENTED,
             controlTreatment = ControlTreatment.MACHINED,
             horizontalPadding = 38.dp,

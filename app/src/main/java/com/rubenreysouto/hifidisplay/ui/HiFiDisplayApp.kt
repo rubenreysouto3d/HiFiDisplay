@@ -11,7 +11,6 @@ import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -94,6 +93,7 @@ fun HiFiDisplayApp(
     val colors = appearance.palette.colors
     var showSourcePicker by remember { mutableStateOf(false) }
     var showDiagnostics by remember { mutableStateOf(false) }
+    var showArtworkFocus by remember { mutableStateOf(false) }
     var interaction by remember { mutableStateOf(AmbientInteractionState()) }
     val activeDisplay = state.availability == SessionAvailability.ACTIVE
     fun dispatch(event: AmbientInteractionEvent) {
@@ -170,6 +170,10 @@ fun HiFiDisplayApp(
                             showDiagnostics = true
                             dispatch(AmbientInteractionEvent.OVERLAY_OPENED)
                         },
+                        onShowArtworkFocus = {
+                            showArtworkFocus = true
+                            dispatch(AmbientInteractionEvent.OVERLAY_OPENED)
+                        },
                     )
                 }
                 if (!activeDisplay) {
@@ -210,6 +214,15 @@ fun HiFiDisplayApp(
                         state,
                         onDismiss = {
                             showDiagnostics = false
+                            dispatch(AmbientInteractionEvent.OVERLAY_CLOSED)
+                        },
+                    )
+                }
+                if (showArtworkFocus) {
+                    ArtworkFocusOverlay(
+                        state = state,
+                        onDismiss = {
+                            showArtworkFocus = false
                             dispatch(AmbientInteractionEvent.OVERLAY_CLOSED)
                         },
                     )
@@ -314,6 +327,101 @@ private fun EmptySession() {
 }
 
 @Composable
+private fun ArtworkFocusOverlay(
+    state: MediaUiState,
+    onDismiss: () -> Unit,
+) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val view = LocalView.current
+    BoxWithConstraints(
+        Modifier
+            .fillMaxSize()
+            .background(Background)
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null,
+                role = Role.Button,
+                onClickLabel = "Cerrar vista de portada",
+                onClick = {
+                    view.performPremiumHaptic()
+                    onDismiss()
+                },
+            )
+            .padding(horizontal = 42.dp, vertical = 28.dp),
+    ) {
+        val compact = maxHeight < 360.dp
+        Row(
+            Modifier.fillMaxSize(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center,
+        ) {
+            Box(
+                Modifier
+                    .fillMaxHeight(if (compact) .94f else .9f)
+                    .aspectRatio(1f)
+                    .clip(RoundedCornerShape(if (compact) 8.dp else 14.dp))
+                    .background(Surface)
+                    .border(1.dp, PrimaryText.copy(alpha = .16f), RoundedCornerShape(if (compact) 8.dp else 14.dp)),
+            ) {
+                ArtworkVisual(state, ArtworkMotion.DISSOLVE)
+                Box(
+                    Modifier
+                        .align(Alignment.TopCenter)
+                        .fillMaxWidth(.62f)
+                        .height(1.dp)
+                        .background(Brush.horizontalGradient(listOf(Color.Transparent, PrimaryText.copy(alpha = .62f), Color.Transparent))),
+                )
+            }
+            Spacer(Modifier.width(if (compact) 28.dp else 52.dp))
+            Column(
+                Modifier.widthIn(min = 220.dp, max = 470.dp),
+                verticalArrangement = Arrangement.Center,
+            ) {
+                Text(
+                    "ALBUM FOCUS  /  TAP TO RETURN",
+                    color = Accent,
+                    fontSize = if (compact) 7.sp else 9.sp,
+                    fontFamily = FontFamily.Monospace,
+                    letterSpacing = 1.7.sp,
+                )
+                Spacer(Modifier.height(if (compact) 12.dp else 20.dp))
+                Text(
+                    state.title?.takeUnless(String::isBlank) ?: "Título no disponible",
+                    color = PrimaryText,
+                    fontSize = if (compact) 30.sp else 46.sp,
+                    lineHeight = if (compact) 33.sp else 49.sp,
+                    fontWeight = FontWeight.Light,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                state.artist?.takeUnless(String::isBlank)?.let {
+                    Spacer(Modifier.height(10.dp))
+                    Text(it, color = PrimaryText.copy(alpha = .7f), fontSize = if (compact) 15.sp else 20.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+                state.album?.takeUnless(String::isBlank)?.let {
+                    Spacer(Modifier.height(7.dp))
+                    Text(it.uppercase(), color = SecondaryText, fontSize = 9.sp, fontFamily = FontFamily.Monospace, letterSpacing = 1.3.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+                Spacer(Modifier.height(if (compact) 20.dp else 34.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(Modifier.size(5.dp).clip(CircleShape).background(if (state.isPlaying) Accent else SecondaryText.copy(alpha = .42f)))
+                    Spacer(Modifier.width(9.dp))
+                    Text(
+                        (state.sourceApp ?: "MEDIA SESSION").uppercase(),
+                        color = SecondaryText,
+                        fontSize = 8.sp,
+                        fontFamily = FontFamily.Monospace,
+                        letterSpacing = 1.3.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
 private fun NowPlaying(
     state: MediaUiState,
     design: DisplayDesign,
@@ -329,6 +437,7 @@ private fun NowPlaying(
     onKeepAlive: () -> Unit,
     onShowSources: () -> Unit,
     onShowDiagnostics: () -> Unit,
+    onShowArtworkFocus: () -> Unit,
 ) {
     var burnInStep by remember { mutableIntStateOf(0) }
     LaunchedEffect(Unit) {
@@ -354,6 +463,7 @@ private fun NowPlaying(
             onKeepAlive = onKeepAlive,
             onShowSources = onShowSources,
             onShowDiagnostics = onShowDiagnostics,
+            onShowArtworkFocus = onShowArtworkFocus,
             onPlay = onPlay,
             onPause = onPause,
             onPrevious = onPrevious,
@@ -375,6 +485,7 @@ private fun PlaybackSkinLayout(
     onKeepAlive: () -> Unit,
     onShowSources: () -> Unit,
     onShowDiagnostics: () -> Unit,
+    onShowArtworkFocus: () -> Unit,
     onPlay: () -> Unit,
     onPause: () -> Unit,
     onPrevious: () -> Unit,
@@ -383,38 +494,28 @@ private fun PlaybackSkinLayout(
 ) {
     val tokens = design.tokens
     val artworkInteraction = remember { MutableInteractionSource() }
-    val metadataInteraction = remember { MutableInteractionSource() }
+    val screenInteraction = remember { MutableInteractionSource() }
     val artworkPressed by artworkInteraction.collectIsPressedAsState()
-    val metadataPressed by metadataInteraction.collectIsPressedAsState()
     val artworkScale by animateFloatAsState(
         targetValue = if (artworkPressed) .975f else 1f,
         animationSpec = tween(110),
         label = "artwork touch",
     )
-    val metadataAlpha by animateFloatAsState(
-        targetValue = if (metadataPressed) .82f else 1f,
-        animationSpec = tween(100),
-        label = "metadata touch",
-    )
     val view = LocalView.current
-    var controlCue by remember { mutableStateOf<ControlCue?>(null) }
-    var controlCueId by remember { mutableLongStateOf(0L) }
-    LaunchedEffect(controlCueId) {
-        if (controlCueId == 0L) return@LaunchedEffect
-        delay(CONTROL_CUE_DURATION_MS)
-        controlCue = controlCue?.copy(visible = false)
-        delay(CONTROL_CUE_EXIT_MS)
-        controlCue = null
-    }
-    fun toggleControls() {
-        controlCueId += 1L
-        controlCue = ControlCue(
-            showsControls = !controlsVisible,
-            visible = true,
-        )
-        onToggleControls()
-    }
-    BoxWithConstraints(Modifier.fillMaxSize()) {
+    BoxWithConstraints(
+        Modifier
+            .fillMaxSize()
+            .clickable(
+                interactionSource = screenInteraction,
+                indication = null,
+                role = Role.Button,
+                onClickLabel = if (controlsVisible) "Ocultar controles" else "Mostrar controles",
+                onClick = {
+                    view.performPremiumHaptic()
+                    onToggleControls()
+                },
+            ),
+    ) {
         val layoutMode = resolveDisplayLayoutMode(maxWidth.value, maxHeight.value)
         val compact = layoutMode == DisplayLayoutMode.COMPACT
         val horizontalPadding = when (layoutMode) {
@@ -438,13 +539,11 @@ private fun PlaybackSkinLayout(
                 controlsVisible = controlsVisible,
                 artworkPressed = artworkPressed,
                 artworkScale = artworkScale,
-                metadataAlpha = metadataAlpha,
-                controlCue = controlCue,
+                controlCue = null,
                 artworkInteraction = artworkInteraction,
-                metadataInteraction = metadataInteraction,
                 onToggleControls = {
                     view.performPremiumHaptic()
-                    toggleControls()
+                    onShowArtworkFocus()
                 },
                 onInteraction = onKeepAlive,
                 onShowSources = onShowSources,
@@ -465,13 +564,11 @@ private fun PlaybackSkinLayout(
                 controlsVisible = controlsVisible,
                 artworkPressed = artworkPressed,
                 artworkScale = artworkScale,
-                metadataAlpha = metadataAlpha,
-                controlCue = controlCue,
+                controlCue = null,
                 artworkInteraction = artworkInteraction,
-                metadataInteraction = metadataInteraction,
                 onToggleControls = {
                     view.performPremiumHaptic()
-                    toggleControls()
+                    onShowArtworkFocus()
                 },
                 onInteraction = onKeepAlive,
                 onShowSources = onShowSources,
@@ -492,13 +589,11 @@ private fun PlaybackSkinLayout(
                 controlsVisible = controlsVisible,
                 artworkPressed = artworkPressed,
                 artworkScale = artworkScale,
-                metadataAlpha = metadataAlpha,
-                controlCue = controlCue,
+                controlCue = null,
                 artworkInteraction = artworkInteraction,
-                metadataInteraction = metadataInteraction,
                 onToggleControls = {
                     view.performPremiumHaptic()
-                    toggleControls()
+                    onShowArtworkFocus()
                 },
                 onInteraction = onKeepAlive,
                 onShowSources = onShowSources,
@@ -528,7 +623,7 @@ private fun PlaybackSkinLayout(
                     motion = artworkMotion,
                     playbackEffect = playbackArtworkEffect,
                     pressed = artworkPressed,
-                    controlCue = controlCue,
+                    controlCue = null,
                     modifier = Modifier
                         .fillMaxHeight()
                         .aspectRatio(1f)
@@ -538,7 +633,7 @@ private fun PlaybackSkinLayout(
                             indication = null,
                             onClick = {
                                 view.performPremiumHaptic()
-                                toggleControls()
+                                onShowArtworkFocus()
                             },
                         ),
                 )
@@ -560,15 +655,7 @@ private fun PlaybackSkinLayout(
                 metadataModifier = Modifier
                     .weight(1f)
                     .fillMaxWidth()
-                    .graphicsLayer { alpha = metadataAlpha }
-                    .clickable(
-                        interactionSource = metadataInteraction,
-                        indication = null,
-                        onClick = {
-                            view.performPremiumHaptic()
-                            toggleControls()
-                        },
-                    ),
+                    .graphicsLayer { alpha = 1f },
                 modifier = Modifier.weight(1f).fillMaxHeight(),
             )
             if (tokens.artworkPlacement == ArtworkPlacement.TRAILING) {
@@ -579,7 +666,7 @@ private fun PlaybackSkinLayout(
                     motion = artworkMotion,
                     playbackEffect = playbackArtworkEffect,
                     pressed = artworkPressed,
-                    controlCue = controlCue,
+                    controlCue = null,
                     modifier = Modifier
                         .fillMaxHeight()
                         .aspectRatio(1f)
@@ -589,7 +676,7 @@ private fun PlaybackSkinLayout(
                             indication = null,
                             onClick = {
                                 view.performPremiumHaptic()
-                                toggleControls()
+                                onShowArtworkFocus()
                             },
                         ),
                 )
@@ -670,10 +757,8 @@ private fun MonolithGlassLayout(
     controlsVisible: Boolean,
     artworkPressed: Boolean,
     artworkScale: Float,
-    metadataAlpha: Float,
     controlCue: ControlCue?,
     artworkInteraction: MutableInteractionSource,
-    metadataInteraction: MutableInteractionSource,
     onToggleControls: () -> Unit,
     onInteraction: () -> Unit,
     onShowSources: () -> Unit,
@@ -700,7 +785,7 @@ private fun MonolithGlassLayout(
             controlCue = null,
             modifier = Modifier
                 .fillMaxHeight()
-                .fillMaxWidth(if (compact) .55f else .62f)
+                .aspectRatio(1f)
                 .graphicsLayer { scaleX = artworkScale; scaleY = artworkScale }
                 .clickable(
                     interactionSource = artworkInteraction,
@@ -728,12 +813,7 @@ private fun MonolithGlassLayout(
                 .align(Alignment.CenterEnd)
                 .fillMaxWidth(if (compact) .55f else .52f)
                 .padding(end = if (compact) 16.dp else 34.dp, bottom = 72.dp)
-                .graphicsLayer { alpha = metadataAlpha }
-                .clickable(
-                    interactionSource = metadataInteraction,
-                    indication = null,
-                    onClick = onToggleControls,
-                ),
+                .graphicsLayer { alpha = 1f },
             verticalArrangement = Arrangement.Center,
         ) {
             MonolithEditorialMetadata(state, compact)
@@ -863,10 +943,8 @@ private fun CrystalAtriumLayout(
     controlsVisible: Boolean,
     artworkPressed: Boolean,
     artworkScale: Float,
-    metadataAlpha: Float,
     controlCue: ControlCue?,
     artworkInteraction: MutableInteractionSource,
-    metadataInteraction: MutableInteractionSource,
     onToggleControls: () -> Unit,
     onInteraction: () -> Unit,
     onShowSources: () -> Unit,
@@ -964,12 +1042,7 @@ private fun CrystalAtriumLayout(
                     Modifier
                         .weight(1f)
                         .fillMaxHeight()
-                        .graphicsLayer { alpha = metadataAlpha }
-                        .clickable(
-                            interactionSource = metadataInteraction,
-                            indication = null,
-                            onClick = onToggleControls,
-                        ),
+                        .graphicsLayer { alpha = 1f },
                 ) {
                     Row(
                         Modifier.fillMaxWidth().height(if (compact) 42.dp else 48.dp),
@@ -1118,10 +1191,8 @@ private fun PrecisionDeckLayout(
     controlsVisible: Boolean,
     artworkPressed: Boolean,
     artworkScale: Float,
-    metadataAlpha: Float,
     controlCue: ControlCue?,
     artworkInteraction: MutableInteractionSource,
-    metadataInteraction: MutableInteractionSource,
     onToggleControls: () -> Unit,
     onInteraction: () -> Unit,
     onShowSources: () -> Unit,
@@ -1169,7 +1240,7 @@ private fun PrecisionDeckLayout(
                 start = if (compact) 24.dp else 40.dp,
                 end = if (compact) 24.dp else 40.dp,
                 top = if (compact) 18.dp else 26.dp,
-                bottom = 92.dp,
+                bottom = if (compact) 16.dp else 24.dp,
             ),
         ) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -1197,12 +1268,7 @@ private fun PrecisionDeckLayout(
                     Modifier
                         .weight(1f)
                         .fillMaxHeight()
-                        .graphicsLayer { alpha = metadataAlpha }
-                        .clickable(
-                            interactionSource = metadataInteraction,
-                            indication = null,
-                            onClick = onToggleControls,
-                        )
+                        .graphicsLayer { alpha = 1f }
                         .padding(end = if (compact) 22.dp else 42.dp),
                     verticalArrangement = Arrangement.Center,
                 ) {
@@ -1234,6 +1300,22 @@ private fun PrecisionDeckLayout(
                             onClick = onToggleControls,
                         ),
                 )
+            }
+            AnimatedVisibility(
+                visible = !controlsVisible,
+                enter = fadeIn(tween(180)),
+                exit = fadeOut(tween(120)),
+            ) {
+                Column {
+                    Spacer(Modifier.height(if (compact) 8.dp else 12.dp))
+                    Progress(
+                        state = state,
+                        design = design,
+                        controlsVisible = false,
+                        onInteraction = onInteraction,
+                        onSeek = onSeek,
+                    )
+                }
             }
         }
         AnimatedVisibility(
@@ -1746,6 +1828,13 @@ private fun SourceHeader(
     }
 }
 
+private enum class DisplayPanelSection(val label: String) {
+    SOURCE("FUENTE"),
+    DESIGN("DISEÑO"),
+    COLOR("COLOR"),
+    MOTION("MOVIMIENTO"),
+}
+
 @Composable
 private fun SourcePickerOverlay(
     state: MediaUiState,
@@ -1758,32 +1847,138 @@ private fun SourcePickerOverlay(
     onShowDiagnostics: () -> Unit,
     onDismiss: () -> Unit,
 ) {
+    var section by remember { mutableStateOf(DisplayPanelSection.SOURCE) }
     var previewMotion by remember(appearance.artworkMotion) { mutableStateOf(appearance.artworkMotion) }
     var motionPreviewId by remember { mutableLongStateOf(0L) }
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(Background)
-            .padding(horizontal = 48.dp, vertical = 20.dp),
+            .padding(horizontal = 42.dp, vertical = 18.dp),
     ) {
         Column(Modifier.fillMaxSize()) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    "SOURCE / DISPLAY",
-                    color = Accent,
-                    fontSize = 13.sp,
-                    fontFamily = FontFamily.Monospace,
-                    letterSpacing = 2.sp,
-                    modifier = Modifier.weight(1f),
-                )
+                Column(Modifier.weight(1f)) {
+                    Text("DISPLAY CONTROL", color = Accent, fontSize = 13.sp, fontFamily = FontFamily.Monospace, letterSpacing = 2.sp)
+                    Text(
+                        "${appearance.design.displayName.uppercase()}  ·  ${appearance.palette.displayName.uppercase()}",
+                        color = SecondaryText,
+                        fontSize = 8.sp,
+                        fontFamily = FontFamily.Monospace,
+                        letterSpacing = 1.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
                 IconButton(onClick = onDismiss, modifier = Modifier.size(48.dp)) {
                     Icon(Icons.Rounded.Close, "Cerrar", tint = SecondaryText)
                 }
             }
-            Spacer(Modifier.height(10.dp))
-            Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState())) {
-                Text("FUENTE", color = SecondaryText, fontSize = 10.sp, fontFamily = FontFamily.Monospace, letterSpacing = 1.5.sp)
-                Spacer(Modifier.height(7.dp))
+            Spacer(Modifier.height(8.dp))
+            DisplayPanelTabs(section, onSelect = { section = it })
+            Spacer(Modifier.height(12.dp))
+            Crossfade(
+                targetState = section,
+                animationSpec = tween(180),
+                label = "display panel section",
+                modifier = Modifier.weight(1f).fillMaxWidth(),
+            ) { activeSection ->
+                when (activeSection) {
+                    DisplayPanelSection.SOURCE -> SourceSelectionPanel(state, onSelectSource, onShowDiagnostics)
+                    DisplayPanelSection.DESIGN -> Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+                        PanelIntro("DISPLAY DESIGN", "STRUCTURE · TYPOGRAPHY · CONTROL LANGUAGE")
+                        Spacer(Modifier.height(10.dp))
+                        DesignPreviewGrid(selected = appearance.design, onSelect = onSelectDesign)
+                    }
+                    DisplayPanelSection.COLOR -> Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+                        PanelIntro("COLOR SYSTEM", "INDEPENDENT FROM DESIGN · TAP FOR LIVE PREVIEW")
+                        Spacer(Modifier.height(10.dp))
+                        PalettePickerGrid(selected = appearance.palette, onSelect = onSelectPalette)
+                    }
+                    DisplayPanelSection.MOTION -> MotionSelectionPanel(
+                        appearance = appearance,
+                        previewMotion = previewMotion,
+                        motionPreviewId = motionPreviewId,
+                        onSelectArtworkMotion = { option ->
+                            previewMotion = option
+                            motionPreviewId += 1L
+                            onSelectArtworkMotion(option)
+                        },
+                        onSelectPlaybackArtworkEffect = onSelectPlaybackArtworkEffect,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun DisplayPanelTabs(
+    selected: DisplayPanelSection,
+    onSelect: (DisplayPanelSection) -> Unit,
+) {
+    val view = LocalView.current
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .height(48.dp)
+            .clip(RoundedCornerShape(5.dp))
+            .background(Surface.copy(alpha = .72f))
+            .border(1.dp, SecondaryText.copy(alpha = .12f), RoundedCornerShape(5.dp))
+            .padding(4.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        DisplayPanelSection.entries.forEach { section ->
+            val active = section == selected
+            Box(
+                Modifier
+                    .weight(1f)
+                    .fillMaxHeight()
+                    .clip(RoundedCornerShape(3.dp))
+                    .background(if (active) Accent.copy(alpha = .13f) else Color.Transparent)
+                    .border(1.dp, if (active) Accent.copy(alpha = .42f) else Color.Transparent, RoundedCornerShape(3.dp))
+                    .clickable(
+                        role = Role.Tab,
+                        onClick = {
+                            view.performPremiumHaptic()
+                            onSelect(section)
+                        },
+                    ),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    section.label,
+                    color = if (active) Accent else SecondaryText,
+                    fontSize = 9.sp,
+                    fontFamily = FontFamily.Monospace,
+                    letterSpacing = 1.2.sp,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun PanelIntro(title: String, subtitle: String) {
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Box(Modifier.width(18.dp).height(1.dp).background(Accent.copy(alpha = .72f)))
+        Spacer(Modifier.width(10.dp))
+        Column {
+            Text(title, color = PrimaryText, fontSize = 11.sp, fontFamily = FontFamily.Monospace, letterSpacing = 1.3.sp)
+            Text(subtitle, color = SecondaryText, fontSize = 7.sp, fontFamily = FontFamily.Monospace, letterSpacing = .8.sp)
+        }
+    }
+}
+
+@Composable
+private fun SourceSelectionPanel(
+    state: MediaUiState,
+    onSelectSource: (String?) -> Unit,
+    onShowDiagnostics: () -> Unit,
+) {
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+        PanelIntro("ACTIVE SOURCE", "AUTO-FOLLOW OR PIN ONE MEDIA SESSION")
+        Spacer(Modifier.height(10.dp))
                 PickerRow(
                     title = "AUTO",
                     subtitle = "Sigue la sesión con mayor actividad",
@@ -1823,63 +2018,9 @@ private fun SourcePickerOverlay(
                         onClick = { onSelectSource(source.packageName) },
                     )
                 }
-                Spacer(Modifier.height(16.dp))
-                Text("DESIGN", color = SecondaryText, fontSize = 10.sp, fontFamily = FontFamily.Monospace, letterSpacing = 1.5.sp)
-                Spacer(Modifier.height(7.dp))
-                DesignPreviewGrid(
-                    selected = appearance.design,
-                    onSelect = onSelectDesign,
-                )
-                Spacer(Modifier.height(16.dp))
-                Text("PALETTE", color = SecondaryText, fontSize = 10.sp, fontFamily = FontFamily.Monospace, letterSpacing = 1.5.sp)
-                Spacer(Modifier.height(7.dp))
-                PalettePickerGrid(
-                    selected = appearance.palette,
-                    onSelect = onSelectPalette,
-                )
-                Spacer(Modifier.height(16.dp))
-                Text("TRACK TRANSITION", color = SecondaryText, fontSize = 10.sp, fontFamily = FontFamily.Monospace, letterSpacing = 1.5.sp)
-                Spacer(Modifier.height(7.dp))
-                ArtworkMotionPreview(previewMotion, motionPreviewId)
-                Spacer(Modifier.height(7.dp))
-                ArtworkMotion.entries.forEach { option ->
-                    PickerRow(
-                        title = option.displayName,
-                        subtitle = option.descriptor,
-                        selected = appearance.artworkMotion == option,
-                        selectedLabel = "ACTIVE",
-                        onClick = {
-                            previewMotion = option
-                            motionPreviewId += 1L
-                            onSelectArtworkMotion(option)
-                        },
-                    )
-                }
-                Spacer(Modifier.height(16.dp))
-                Text("PLAYBACK EFFECT", color = SecondaryText, fontSize = 10.sp, fontFamily = FontFamily.Monospace, letterSpacing = 1.5.sp)
-                Spacer(Modifier.height(3.dp))
-                Text(
-                    "VISUAL CADENCE · NOT AUDIO-SYNCED",
-                    color = SecondaryText.copy(alpha = .62f),
-                    fontSize = 8.sp,
-                    fontFamily = FontFamily.Monospace,
-                    letterSpacing = .8.sp,
-                )
-                Spacer(Modifier.height(7.dp))
-                PlaybackEffectPreview(appearance.playbackArtworkEffect)
-                Spacer(Modifier.height(7.dp))
-                PlaybackArtworkEffect.entries.forEach { option ->
-                    PickerRow(
-                        title = option.displayName,
-                        subtitle = option.descriptor,
-                        selected = appearance.playbackArtworkEffect == option,
-                        selectedLabel = "ACTIVE",
-                        onClick = { onSelectPlaybackArtworkEffect(option) },
-                    )
-                }
-                Spacer(Modifier.height(16.dp))
-                Text("TOOLS", color = SecondaryText, fontSize = 10.sp, fontFamily = FontFamily.Monospace, letterSpacing = 1.5.sp)
-                Spacer(Modifier.height(7.dp))
+        Spacer(Modifier.height(14.dp))
+        PanelIntro("TOOLS", "SESSION CAPABILITIES AND RAW MEDIA DATA")
+        Spacer(Modifier.height(8.dp))
                 PickerRow(
                     title = "Session diagnostics",
                     subtitle = if (state.hasActiveSession) "VIEW SESSION CAPABILITIES" else "REQUIRES AN ACTIVE SESSION",
@@ -1887,7 +2028,161 @@ private fun SourcePickerOverlay(
                     enabled = state.hasActiveSession,
                     onClick = onShowDiagnostics,
                 )
-                Spacer(Modifier.height(12.dp))
+        Spacer(Modifier.height(12.dp))
+    }
+}
+
+@Composable
+private fun MotionSelectionPanel(
+    appearance: DisplayAppearance,
+    previewMotion: ArtworkMotion,
+    motionPreviewId: Long,
+    onSelectArtworkMotion: (ArtworkMotion) -> Unit,
+    onSelectPlaybackArtworkEffect: (PlaybackArtworkEffect) -> Unit,
+) {
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+        val wide = maxWidth >= 760.dp
+        if (wide) {
+            Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(18.dp)) {
+                MotionOptionColumn(
+                    modifier = Modifier.weight(1f),
+                    title = "TRACK TRANSITION",
+                    subtitle = "CHANGEOVER BETWEEN COVERS",
+                    preview = { ArtworkMotionPreview(previewMotion, motionPreviewId) },
+                ) {
+                    MotionChoiceGrid(
+                        options = ArtworkMotion.entries,
+                        selected = appearance.artworkMotion,
+                        title = ArtworkMotion::displayName,
+                        subtitle = ArtworkMotion::descriptor,
+                        onSelect = onSelectArtworkMotion,
+                    )
+                }
+                MotionOptionColumn(
+                    modifier = Modifier.weight(1f),
+                    title = "PLAYBACK PRESENCE",
+                    subtitle = "POSITION-LOCKED CADENCE · NOT BEAT DETECTION",
+                    preview = { PlaybackEffectPreview(appearance.playbackArtworkEffect) },
+                ) {
+                    MotionChoiceGrid(
+                        options = PlaybackArtworkEffect.entries,
+                        selected = appearance.playbackArtworkEffect,
+                        title = PlaybackArtworkEffect::displayName,
+                        subtitle = PlaybackArtworkEffect::descriptor,
+                        onSelect = onSelectPlaybackArtworkEffect,
+                    )
+                }
+            }
+        } else {
+            Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+                MotionOptionColumn(
+                    modifier = Modifier.fillMaxWidth(),
+                    title = "TRACK TRANSITION",
+                    subtitle = "CHANGEOVER BETWEEN COVERS",
+                    preview = { ArtworkMotionPreview(previewMotion, motionPreviewId) },
+                ) {
+                    MotionChoiceGrid(
+                        options = ArtworkMotion.entries,
+                        selected = appearance.artworkMotion,
+                        title = ArtworkMotion::displayName,
+                        subtitle = ArtworkMotion::descriptor,
+                        onSelect = onSelectArtworkMotion,
+                    )
+                }
+                Spacer(Modifier.height(16.dp))
+                MotionOptionColumn(
+                    modifier = Modifier.fillMaxWidth(),
+                    title = "PLAYBACK PRESENCE",
+                    subtitle = "POSITION-LOCKED CADENCE · NOT BEAT DETECTION",
+                    preview = { PlaybackEffectPreview(appearance.playbackArtworkEffect) },
+                ) {
+                    MotionChoiceGrid(
+                        options = PlaybackArtworkEffect.entries,
+                        selected = appearance.playbackArtworkEffect,
+                        title = PlaybackArtworkEffect::displayName,
+                        subtitle = PlaybackArtworkEffect::descriptor,
+                        onSelect = onSelectPlaybackArtworkEffect,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun MotionOptionColumn(
+    modifier: Modifier,
+    title: String,
+    subtitle: String,
+    preview: @Composable () -> Unit,
+    options: @Composable ColumnScope.() -> Unit,
+) {
+    Column(modifier) {
+        PanelIntro(title, subtitle)
+        Spacer(Modifier.height(8.dp))
+        preview()
+        Spacer(Modifier.height(6.dp))
+        options()
+    }
+}
+
+@Composable
+private fun <T> MotionChoiceGrid(
+    options: List<T>,
+    selected: T,
+    title: (T) -> String,
+    subtitle: (T) -> String,
+    onSelect: (T) -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        options.chunked(2).forEach { rowOptions ->
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                rowOptions.forEach { option ->
+                    val active = option == selected
+                    val interactionSource = remember { MutableInteractionSource() }
+                    val pressed by interactionSource.collectIsPressedAsState()
+                    val view = LocalView.current
+                    Column(
+                        Modifier
+                            .weight(1f)
+                            .height(62.dp)
+                            .clip(RoundedCornerShape(4.dp))
+                            .background(
+                                when {
+                                    pressed -> SurfaceRaised.copy(alpha = .68f)
+                                    active -> Accent.copy(alpha = .11f)
+                                    else -> SurfaceRaised.copy(alpha = .2f)
+                                },
+                            )
+                            .border(1.dp, if (active) Accent.copy(alpha = .5f) else SecondaryText.copy(alpha = .1f), RoundedCornerShape(4.dp))
+                            .clickable(
+                                interactionSource = interactionSource,
+                                indication = null,
+                                role = Role.RadioButton,
+                                onClick = {
+                                    view.performPremiumHaptic()
+                                    onSelect(option)
+                                },
+                            )
+                            .padding(horizontal = 10.dp, vertical = 8.dp),
+                    ) {
+                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                            Text(title(option), color = PrimaryText, fontSize = 11.sp, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Box(Modifier.size(5.dp).clip(CircleShape).background(if (active) Accent else SecondaryText.copy(alpha = .24f)))
+                        }
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            subtitle(option),
+                            color = SecondaryText,
+                            fontSize = 7.sp,
+                            fontFamily = FontFamily.Monospace,
+                            letterSpacing = .55.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
+                if (rowOptions.size == 1) Spacer(Modifier.weight(1f))
             }
         }
     }
@@ -2022,20 +2317,15 @@ private fun DesignPreviewGrid(
     onSelect: (DisplayDesign) -> Unit,
 ) {
     BoxWithConstraints(Modifier.fillMaxWidth()) {
-        if (maxWidth < 600.dp) {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                DisplayDesign.entries.forEach { design ->
-                    DesignPreviewCard(design, selected == design, { onSelect(design) }, Modifier.fillMaxWidth())
-                }
-            }
-        } else {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                DisplayDesign.entries.toList().chunked(2).forEach { rowDesigns ->
-                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        rowDesigns.forEach { design ->
-                            DesignPreviewCard(design, selected == design, { onSelect(design) }, Modifier.weight(1f))
-                        }
-                        if (rowDesigns.size == 1) Spacer(Modifier.weight(1f))
+        val columns = if (maxWidth < 700.dp) 2 else 3
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            DisplayDesign.entries.toList().chunked(columns).forEach { rowDesigns ->
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    rowDesigns.forEach { design ->
+                        DesignPreviewCard(design, selected == design, { onSelect(design) }, Modifier.weight(1f))
+                    }
+                    repeat(columns - rowDesigns.size) {
+                        Spacer(Modifier.weight(1f))
                     }
                 }
             }
@@ -2136,12 +2426,14 @@ private fun DesignMiniature(design: DisplayDesign) {
         if (design == DisplayDesign.STUDIO_LEDGER || design == DisplayDesign.PRECISION_DECK) {
             Spacer(Modifier.width(9.dp))
             if (design == DisplayDesign.PRECISION_DECK) {
-                Box(Modifier.size(28.dp), contentAlignment = Alignment.Center) {
-                    Canvas(Modifier.fillMaxSize()) {
-                        drawCircle(miniatureSecondary.copy(alpha = .3f), style = Stroke(1.dp.toPx()))
-                        drawArc(miniatureAccent.copy(alpha = .75f), -90f, 210f, false, style = Stroke(2.dp.toPx()))
-                    }
-                    Box(Modifier.size(17.dp).background(SecondaryText.copy(alpha = .2f)))
+                Box(
+                    Modifier
+                        .size(28.dp)
+                        .border(1.dp, miniatureSecondary.copy(alpha = .3f), RoundedCornerShape(1.dp))
+                        .padding(3.dp),
+                ) {
+                    Box(Modifier.fillMaxSize().background(SecondaryText.copy(alpha = .2f)))
+                    Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(2.dp).background(miniatureAccent.copy(alpha = .75f)))
                 }
             } else {
                 Column(
@@ -2165,20 +2457,15 @@ private fun PalettePickerGrid(
     onSelect: (ColorPalette) -> Unit,
 ) {
     BoxWithConstraints(Modifier.fillMaxWidth()) {
-        if (maxWidth < 600.dp) {
-            Column {
-                ColorPalette.entries.forEach { palette ->
-                    PalettePickerRow(palette, selected == palette, { onSelect(palette) })
-                }
-            }
-        } else {
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                ColorPalette.entries.toList().chunked(2).forEach { pair ->
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        pair.forEach { palette ->
-                            PalettePickerRow(palette, selected == palette, { onSelect(palette) }, Modifier.weight(1f))
-                        }
-                        if (pair.size == 1) Spacer(Modifier.weight(1f))
+        val columns = if (maxWidth < 700.dp) 2 else 4
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            ColorPalette.entries.toList().chunked(columns).forEach { palettes ->
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    palettes.forEach { palette ->
+                        PalettePickerRow(palette, selected == palette, { onSelect(palette) }, Modifier.weight(1f))
+                    }
+                    repeat(columns - palettes.size) {
+                        Spacer(Modifier.weight(1f))
                     }
                 }
             }
@@ -2201,7 +2488,7 @@ private fun PalettePickerRow(
     Row(
         modifier
             .fillMaxWidth()
-            .heightIn(min = 48.dp)
+            .height(72.dp)
             .graphicsLayer { scaleX = scale; scaleY = scale }
             .clip(RoundedCornerShape(4.dp))
             .background(
@@ -2219,26 +2506,31 @@ private fun PalettePickerRow(
                     onClick()
                 },
             )
-            .padding(horizontal = 14.dp, vertical = 9.dp),
+            .padding(horizontal = 11.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Row(horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Row(horizontalArrangement = Arrangement.spacedBy(3.dp)) {
             listOf(colors.background, colors.primaryText, colors.accent).forEach { color ->
                 Box(
                     Modifier
-                        .size(12.dp)
+                            .size(10.dp)
                         .clip(CircleShape)
                         .background(color)
                         .border(1.dp, SecondaryText.copy(alpha = .2f), CircleShape),
                 )
             }
+            }
+            if (selected) {
+                Spacer(Modifier.height(5.dp))
+                Box(Modifier.width(20.dp).height(2.dp).background(Accent))
+            }
         }
-        Spacer(Modifier.width(12.dp))
+        Spacer(Modifier.width(9.dp))
         Column(Modifier.weight(1f)) {
-            Text(palette.displayName, color = PrimaryText, fontSize = 14.sp)
-            Text(palette.descriptor, color = SecondaryText, fontSize = 8.sp, fontFamily = FontFamily.Monospace, letterSpacing = 1.sp)
+            Text(palette.displayName, color = PrimaryText, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(palette.descriptor, color = SecondaryText, fontSize = 7.sp, fontFamily = FontFamily.Monospace, letterSpacing = .65.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
-        if (selected) Text("ACTIVE", color = Accent, fontSize = 9.sp, fontFamily = FontFamily.Monospace)
     }
 }
 
@@ -2373,7 +2665,7 @@ private fun Artwork(
     controlCue: ControlCue?,
     modifier: Modifier,
 ) {
-    val playbackVisual = rememberPlaybackArtworkVisual(playbackEffect, state.isPlaying)
+    val playbackVisual = rememberPlaybackArtworkVisual(playbackEffect, state.isPlaying, state.positionMs)
     val animatedModifier = modifier.graphicsLayer {
         scaleX *= playbackVisual.scale
         scaleY *= playbackVisual.scale
@@ -2384,7 +2676,7 @@ private fun Artwork(
         ArtworkTreatment.REFERENCE -> ReferenceArtwork(state, design, motion, pressed, controlCue, playbackVisual, animatedModifier)
         ArtworkTreatment.STUDIO_DECK -> StudioArtworkDeck(state, design, motion, pressed, controlCue, playbackVisual, animatedModifier)
         ArtworkTreatment.MONOLITH_GLASS -> MonolithGlassArtwork(state, design, motion, pressed, controlCue, playbackVisual, animatedModifier)
-        ArtworkTreatment.PRECISION_DIAL -> PrecisionDialArtwork(state, design, motion, pressed, controlCue, playbackVisual, animatedModifier)
+        ArtworkTreatment.PRECISION_FRAME -> PrecisionFrameArtwork(state, design, motion, pressed, controlCue, playbackVisual, animatedModifier)
         ArtworkTreatment.CRYSTAL_FLOAT -> CrystalFloatArtwork(state, design, motion, pressed, playbackVisual, animatedModifier)
     }
 }
@@ -2393,24 +2685,31 @@ private fun Artwork(
 private fun rememberPlaybackArtworkVisual(
     effect: PlaybackArtworkEffect,
     isPlaying: Boolean,
+    positionMs: Long = 0L,
 ): PlaybackArtworkVisual {
-    val phase = remember { Animatable(0f) }
+    val latestPosition by rememberUpdatedState(positionMs)
+    var phase by remember(effect) { mutableFloatStateOf(0f) }
     LaunchedEffect(effect, isPlaying) {
-        phase.snapTo(0f)
+        phase = 0f
         if (isPlaying && effect != PlaybackArtworkEffect.STILL) {
-            val halfCycleMs = when (effect) {
-                PlaybackArtworkEffect.PULSE -> 640
-                PlaybackArtworkEffect.DRIFT -> 4_800
-                PlaybackArtworkEffect.HALO -> 1_450
-                PlaybackArtworkEffect.STILL -> 1
-            }
+            var observedPosition = Long.MIN_VALUE
+            var anchorPosition = 0L
+            var anchorFrameMs = 0L
             while (true) {
-                phase.animateTo(1f, tween(halfCycleMs, easing = LinearEasing))
-                phase.animateTo(0f, tween(halfCycleMs, easing = LinearEasing))
+                withFrameMillis { frameMs ->
+                    val reportedPosition = latestPosition
+                    if (reportedPosition != observedPosition) {
+                        observedPosition = reportedPosition
+                        anchorPosition = reportedPosition
+                        anchorFrameMs = frameMs
+                    }
+                    val estimatedPosition = anchorPosition + (frameMs - anchorFrameMs).coerceAtLeast(0L)
+                    phase = resolvePlaybackEffectPhase(effect, estimatedPosition)
+                }
             }
         }
     }
-    return resolvePlaybackArtworkVisual(effect, phase.value, isPlaying)
+    return resolvePlaybackArtworkVisual(effect, phase, isPlaying)
 }
 
 @Composable
@@ -2569,7 +2868,7 @@ private fun MonolithGlassArtwork(
 }
 
 @Composable
-private fun PrecisionDialArtwork(
+private fun PrecisionFrameArtwork(
     state: MediaUiState,
     design: DisplayDesign,
     motion: ArtworkMotion,
@@ -2578,65 +2877,56 @@ private fun PrecisionDialArtwork(
     playbackVisual: PlaybackArtworkVisual,
     modifier: Modifier,
 ) {
-    val duration = state.durationMs?.takeIf { it > 0L }
-    val fraction = if (duration != null) (state.positionMs.toFloat() / duration).coerceIn(0f, 1f) else 0f
-    val dialSecondary = SecondaryText
-    val dialAccent = Accent
+    val shape = RoundedCornerShape(3.dp)
+    val frameSecondary = SecondaryText
+    val frameAccent = Accent
     Box(
         modifier
-            .background(Color.Transparent)
-            .padding(10.dp),
+            .clip(shape)
+            .background(Brush.linearGradient(listOf(SurfaceRaised.copy(alpha = .68f), Surface.copy(alpha = .92f))))
+            .border(
+                1.dp,
+                if (playbackVisual.haloAlpha > 0f) Accent.copy(alpha = playbackVisual.haloAlpha) else frameSecondary.copy(alpha = .2f),
+                shape,
+            )
+            .padding(12.dp),
         contentAlignment = Alignment.Center,
     ) {
-        Canvas(Modifier.fillMaxSize()) {
-            val outer = size.minDimension * .46f
-            drawCircle(dialSecondary.copy(alpha = .11f), radius = outer, style = Stroke(1.dp.toPx()))
-            drawCircle(dialSecondary.copy(alpha = .045f), radius = outer - 10.dp.toPx(), style = Stroke(1.dp.toPx()))
-            if (duration != null) {
-                drawArc(
-                    color = dialAccent.copy(alpha = (.54f + playbackVisual.haloAlpha).coerceAtMost(.96f)),
-                    startAngle = -90f,
-                    sweepAngle = 360f * fraction,
-                    useCenter = false,
-                    topLeft = androidx.compose.ui.geometry.Offset(center.x - outer, center.y - outer),
-                    size = androidx.compose.ui.geometry.Size(outer * 2, outer * 2),
-                    style = Stroke((2.dp + 2.dp * playbackVisual.haloAlpha).toPx()),
-                )
-            }
-            repeat(48) { index ->
-                val angle = Math.toRadians((index * 7.5) - 90.0)
-                val inner = outer - if (index % 12 == 0) 9.dp.toPx() else if (index % 4 == 0) 6.dp.toPx() else 3.dp.toPx()
-                val dialCenter = center
-                drawLine(
-                    dialSecondary.copy(alpha = if (index % 12 == 0) .42f else if (index % 4 == 0) .23f else .1f),
-                    start = androidx.compose.ui.geometry.Offset(
-                        dialCenter.x + kotlin.math.cos(angle).toFloat() * inner,
-                        dialCenter.y + kotlin.math.sin(angle).toFloat() * inner,
-                    ),
-                    end = androidx.compose.ui.geometry.Offset(
-                        dialCenter.x + kotlin.math.cos(angle).toFloat() * outer,
-                        dialCenter.y + kotlin.math.sin(angle).toFloat() * outer,
-                    ),
-                    strokeWidth = 1.dp.toPx(),
-                )
-            }
-        }
         Box(
             Modifier
-                .fillMaxSize(.62f)
-                .clip(RoundedCornerShape(3.dp))
+                .fillMaxSize()
+                .clip(RoundedCornerShape(2.dp))
                 .background(SurfaceRaised)
-                .border(1.dp, if (pressed) Accent.copy(alpha = .55f) else PrimaryText.copy(alpha = .14f), RoundedCornerShape(3.dp)),
+                .border(1.dp, if (pressed) Accent.copy(alpha = .6f) else PrimaryText.copy(alpha = .12f), RoundedCornerShape(2.dp)),
         ) {
             if (state.artwork != null) ArtworkVisual(state, motion) else PrecisionArtworkFallback(state.sourceApp)
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.linearGradient(
+                            listOf(
+                                PrimaryText.copy(alpha = playbackVisual.sheenAlpha * .72f),
+                                Color.Transparent,
+                                Color.Transparent,
+                            ),
+                        ),
+                    ),
+            )
             if (pressed) Box(Modifier.fillMaxSize().background(Accent.copy(alpha = .035f)))
         }
-        Row(Modifier.align(Alignment.BottomCenter).padding(bottom = 2.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text("0", color = SecondaryText.copy(alpha = .52f), fontSize = 6.sp, fontFamily = FontFamily.Monospace)
-            Spacer(Modifier.width(18.dp))
-            Text("TIMEBASE / 48", color = SecondaryText.copy(alpha = .7f), fontSize = 7.sp, fontFamily = FontFamily.Monospace, letterSpacing = 1.3.sp)
-            Spacer(Modifier.width(18.dp))
-            Text("100", color = SecondaryText.copy(alpha = .52f), fontSize = 6.sp, fontFamily = FontFamily.Monospace)
+        Canvas(Modifier.fillMaxSize()) {
+            val length = 18.dp.toPx()
+            val stroke = 1.dp.toPx()
+            val color = if (pressed) frameAccent.copy(alpha = .82f) else frameSecondary.copy(alpha = .38f)
+            drawLine(color, androidx.compose.ui.geometry.Offset.Zero, androidx.compose.ui.geometry.Offset(length, 0f), stroke)
+            drawLine(color, androidx.compose.ui.geometry.Offset.Zero, androidx.compose.ui.geometry.Offset(0f, length), stroke)
+            drawLine(color, androidx.compose.ui.geometry.Offset(size.width, 0f), androidx.compose.ui.geometry.Offset(size.width - length, 0f), stroke)
+            drawLine(color, androidx.compose.ui.geometry.Offset(size.width, 0f), androidx.compose.ui.geometry.Offset(size.width, length), stroke)
+            drawLine(color, androidx.compose.ui.geometry.Offset(0f, size.height), androidx.compose.ui.geometry.Offset(length, size.height), stroke)
+            drawLine(color, androidx.compose.ui.geometry.Offset(0f, size.height), androidx.compose.ui.geometry.Offset(0f, size.height - length), stroke)
+            drawLine(color, androidx.compose.ui.geometry.Offset(size.width, size.height), androidx.compose.ui.geometry.Offset(size.width - length, size.height), stroke)
+            drawLine(color, androidx.compose.ui.geometry.Offset(size.width, size.height), androidx.compose.ui.geometry.Offset(size.width, size.height - length), stroke)
         }
     }
 }
