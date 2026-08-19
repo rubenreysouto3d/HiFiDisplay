@@ -1,7 +1,10 @@
 package com.rubenreysouto.hifidisplay.ui
 
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class DisplayAppearanceTest {
@@ -71,10 +74,31 @@ class DisplayAppearanceTest {
 
     @Test
     fun `new palettes restore from stable storage keys`() {
+        assertEquals(ColorPalette.OLED_ABSOLUTE, ColorPalette.fromStorage("oled-absolute"))
         assertEquals(ColorPalette.ARCTIC_SILVER, ColorPalette.fromStorage("arctic-silver"))
+        assertEquals(ColorPalette.CHAMPAGNE_FROST, ColorPalette.fromStorage("champagne-frost"))
         assertEquals(ColorPalette.COBALT_NIGHT, ColorPalette.fromStorage("cobalt-night"))
         assertEquals(ColorPalette.VELVET_VIOLET, ColorPalette.fromStorage("velvet-violet"))
         assertEquals(ColorPalette.RUBY_SIGNAL, ColorPalette.fromStorage("ruby-signal"))
+    }
+
+    @Test
+    fun `oled palette uses a fully opaque absolute black background`() {
+        val oled = ColorPalette.OLED_ABSOLUTE.colors
+
+        assertTrue(ColorPalette.OLED_ABSOLUTE.isOled)
+        assertEquals(Color.Black, oled.background)
+        assertEquals(1f, oled.background.alpha)
+    }
+
+    @Test
+    fun `light palettes use dark text over genuinely light surfaces`() {
+        listOf(ColorPalette.ARCTIC_SILVER, ColorPalette.CHAMPAGNE_FROST).forEach { palette ->
+            val colors = palette.colors
+            assertTrue(palette.isLight)
+            assertTrue(colors.background.luminance() > colors.primaryText.luminance())
+            assertTrue(colors.surfaceRaised.luminance() > colors.secondaryText.luminance())
+        }
     }
 
     @Test

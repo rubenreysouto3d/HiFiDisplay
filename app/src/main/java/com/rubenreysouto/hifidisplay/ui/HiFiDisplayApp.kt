@@ -72,6 +72,8 @@ private val SurfaceRaised: Color @Composable get() = MaterialTheme.colorScheme.s
 private val PrimaryText: Color @Composable get() = MaterialTheme.colorScheme.onBackground
 private val SecondaryText: Color @Composable get() = MaterialTheme.colorScheme.onSurfaceVariant
 private val Accent: Color @Composable get() = MaterialTheme.colorScheme.primary
+private val LocalOledPalette = staticCompositionLocalOf { false }
+private val OledPalette: Boolean @Composable get() = LocalOledPalette.current
 
 @Composable
 fun HiFiDisplayApp(
@@ -108,8 +110,8 @@ fun HiFiDisplayApp(
             dispatch(AmbientInteractionEvent.TIMEOUT)
         }
     }
-    MaterialTheme(
-        colorScheme = darkColorScheme(
+    val colorScheme = if (appearance.palette.isLight) {
+        lightColorScheme(
             background = colors.background,
             surface = colors.surface,
             surfaceVariant = colors.surfaceRaised,
@@ -117,15 +119,32 @@ fun HiFiDisplayApp(
             onSurface = colors.primaryText,
             onSurfaceVariant = colors.secondaryText,
             primary = colors.accent,
-            onPrimary = colors.background,
-        ),
-    ) {
-        Surface(modifier = Modifier.fillMaxSize(), color = Background) {
-            Box(
-                Modifier
-                    .fillMaxSize()
-                    .windowInsetsPadding(WindowInsets.displayCutout),
-            ) {
+            onPrimary = colors.accentContent,
+            outline = colors.secondaryText,
+            scrim = colors.primaryText,
+        )
+    } else {
+        darkColorScheme(
+            background = colors.background,
+            surface = colors.surface,
+            surfaceVariant = colors.surfaceRaised,
+            onBackground = colors.primaryText,
+            onSurface = colors.primaryText,
+            onSurfaceVariant = colors.secondaryText,
+            primary = colors.accent,
+            onPrimary = colors.accentContent,
+            outline = colors.secondaryText,
+            scrim = colors.background,
+        )
+    }
+    CompositionLocalProvider(LocalOledPalette provides appearance.palette.isOled) {
+        MaterialTheme(colorScheme = colorScheme) {
+            Surface(modifier = Modifier.fillMaxSize(), color = Background) {
+                Box(
+                    Modifier
+                        .fillMaxSize()
+                        .windowInsetsPadding(WindowInsets.displayCutout),
+                ) {
                 when (state.availability) {
                     SessionAvailability.PERMISSION_REQUIRED -> AccessRequired(onOpenAccessSettings)
                     SessionAvailability.NO_SESSION -> EmptySession()
@@ -194,6 +213,7 @@ fun HiFiDisplayApp(
                             dispatch(AmbientInteractionEvent.OVERLAY_CLOSED)
                         },
                     )
+                }
                 }
             }
         }
@@ -582,6 +602,7 @@ private fun PlaybackSkinLayout(
 
 @Composable
 private fun LegacySkinAtmosphere(design: DisplayDesign) {
+    if (OledPalette) return
     val atmospherePrimary = PrimaryText
     val atmosphereSecondary = SecondaryText
     val atmosphereAccent = Accent
@@ -857,6 +878,7 @@ private fun CrystalAtriumLayout(
     onSeek: (Long) -> Unit,
 ) {
     val design = DisplayDesign.CRYSTAL_ATRIUM
+    val oled = OledPalette
     val sheetShape = RoundedCornerShape(if (compact) 24.dp else 32.dp)
     val crystalPrimary = PrimaryText
     val crystalAccent = Accent
@@ -865,24 +887,30 @@ private fun CrystalAtriumLayout(
             .fillMaxSize()
             .offset(x = burnInOffset.first.dp, y = burnInOffset.second.dp)
             .background(
-                Brush.radialGradient(
-                    colors = listOf(Accent.copy(alpha = .13f), Surface.copy(alpha = .52f), Background),
-                    radius = if (compact) 760f else 1_320f,
-                ),
+                if (oled) {
+                    Brush.linearGradient(listOf(Background, Background))
+                } else {
+                    Brush.radialGradient(
+                        colors = listOf(Accent.copy(alpha = .13f), Surface.copy(alpha = .52f), Background),
+                        radius = if (compact) 760f else 1_320f,
+                    )
+                },
             )
             .padding(horizontal = if (compact) 18.dp else 30.dp, vertical = if (compact) 14.dp else 24.dp),
     ) {
-        Canvas(Modifier.fillMaxSize()) {
-            drawCircle(
-                color = crystalPrimary.copy(alpha = .045f),
-                radius = size.minDimension * .68f,
-                center = androidx.compose.ui.geometry.Offset(size.width * .12f, size.height * .05f),
-            )
-            drawCircle(
-                color = crystalAccent.copy(alpha = .035f),
-                radius = size.minDimension * .52f,
-                center = androidx.compose.ui.geometry.Offset(size.width * .91f, size.height * .9f),
-            )
+        if (!oled) {
+            Canvas(Modifier.fillMaxSize()) {
+                drawCircle(
+                    color = crystalPrimary.copy(alpha = .045f),
+                    radius = size.minDimension * .68f,
+                    center = androidx.compose.ui.geometry.Offset(size.width * .12f, size.height * .05f),
+                )
+                drawCircle(
+                    color = crystalAccent.copy(alpha = .035f),
+                    radius = size.minDimension * .52f,
+                    center = androidx.compose.ui.geometry.Offset(size.width * .91f, size.height * .9f),
+                )
+            }
         }
         Box(
             Modifier
@@ -1105,29 +1133,35 @@ private fun PrecisionDeckLayout(
     onSeek: (Long) -> Unit,
 ) {
     val design = DisplayDesign.PRECISION_DECK
+    val oled = OledPalette
     val etched = SecondaryText
     Box(
         Modifier
             .fillMaxSize()
             .offset(x = burnInOffset.first.dp, y = burnInOffset.second.dp)
-            .background(Brush.linearGradient(listOf(Background, Surface.copy(alpha = .48f), Background))),
+            .background(
+                if (oled) Brush.linearGradient(listOf(Background, Background))
+                else Brush.linearGradient(listOf(Background, Surface.copy(alpha = .48f), Background)),
+            ),
     ) {
-        Canvas(Modifier.fillMaxSize()) {
-            val inset = if (compact) 18.dp.toPx() else 28.dp.toPx()
-            drawRect(
-                color = etched.copy(alpha = .06f),
-                topLeft = androidx.compose.ui.geometry.Offset(inset, inset),
-                size = androidx.compose.ui.geometry.Size(size.width - inset * 2, size.height - inset * 2),
-                style = Stroke(1.dp.toPx()),
-            )
-            repeat(9) { index ->
-                val x = inset + (size.width - inset * 2) * index / 8f
-                drawLine(
-                    etched.copy(alpha = if (index == 4) .045f else .022f),
-                    androidx.compose.ui.geometry.Offset(x, inset),
-                    androidx.compose.ui.geometry.Offset(x, size.height - inset),
-                    1.dp.toPx(),
+        if (!oled) {
+            Canvas(Modifier.fillMaxSize()) {
+                val inset = if (compact) 18.dp.toPx() else 28.dp.toPx()
+                drawRect(
+                    color = etched.copy(alpha = .06f),
+                    topLeft = androidx.compose.ui.geometry.Offset(inset, inset),
+                    size = androidx.compose.ui.geometry.Size(size.width - inset * 2, size.height - inset * 2),
+                    style = Stroke(1.dp.toPx()),
                 )
+                repeat(9) { index ->
+                    val x = inset + (size.width - inset * 2) * index / 8f
+                    drawLine(
+                        etched.copy(alpha = if (index == 4) .045f else .022f),
+                        androidx.compose.ui.geometry.Offset(x, inset),
+                        androidx.compose.ui.geometry.Offset(x, size.height - inset),
+                        1.dp.toPx(),
+                    )
+                }
             }
         }
         Column(
@@ -2202,7 +2236,7 @@ private fun PalettePickerRow(
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
             Text(palette.displayName, color = PrimaryText, fontSize = 14.sp)
-            Text("COLOR ONLY", color = SecondaryText, fontSize = 8.sp, fontFamily = FontFamily.Monospace, letterSpacing = 1.sp)
+            Text(palette.descriptor, color = SecondaryText, fontSize = 8.sp, fontFamily = FontFamily.Monospace, letterSpacing = 1.sp)
         }
         if (selected) Text("ACTIVE", color = Accent, fontSize = 9.sp, fontFamily = FontFamily.Monospace)
     }
