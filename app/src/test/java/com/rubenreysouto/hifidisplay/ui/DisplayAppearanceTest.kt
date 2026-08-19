@@ -18,6 +18,7 @@ class DisplayAppearanceTest {
     @Test
     fun `stored artwork motion is restored independently`() {
         assertEquals(ArtworkMotion.DISSOLVE, ArtworkMotion.fromStorage("dissolve"))
+        assertEquals(ArtworkMotion.DECK, ArtworkMotion.fromStorage("deck"))
         assertEquals(ArtworkMotion.DIRECT, ArtworkMotion.fromStorage("direct"))
     }
 
