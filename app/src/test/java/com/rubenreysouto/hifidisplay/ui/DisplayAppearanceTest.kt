@@ -15,6 +15,7 @@ class DisplayAppearanceTest {
         assertEquals(DisplayDesign.STUDIO_LEDGER, DisplayDesign.fromStorage("studio-ledger"))
         assertEquals(DisplayDesign.MONOLITH_GLASS, DisplayDesign.fromStorage("monolith-glass"))
         assertEquals(DisplayDesign.PRECISION_DECK, DisplayDesign.fromStorage("precision-deck"))
+        assertEquals(DisplayDesign.CRYSTAL_ATRIUM, DisplayDesign.fromStorage("crystal-atrium"))
     }
 
     @Test
@@ -63,7 +64,17 @@ class DisplayAppearanceTest {
 
     @Test
     fun `each palette has a distinct accent`() {
+        val accents = ColorPalette.entries.map { it.colors.accent }
+        assertEquals(ColorPalette.entries.size, accents.distinct().size)
         assertNotEquals(ColorPalette.HIFI_GREEN.colors.accent, ColorPalette.WARM_AMBER.colors.accent)
+    }
+
+    @Test
+    fun `new palettes restore from stable storage keys`() {
+        assertEquals(ColorPalette.ARCTIC_SILVER, ColorPalette.fromStorage("arctic-silver"))
+        assertEquals(ColorPalette.COBALT_NIGHT, ColorPalette.fromStorage("cobalt-night"))
+        assertEquals(ColorPalette.VELVET_VIOLET, ColorPalette.fromStorage("velvet-violet"))
+        assertEquals(ColorPalette.RUBY_SIGNAL, ColorPalette.fromStorage("ruby-signal"))
     }
 
     @Test

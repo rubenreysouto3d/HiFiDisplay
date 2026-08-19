@@ -27,6 +27,11 @@ enum class DisplayDesign(
         storageKey = "precision-deck",
         displayName = "Precision Deck",
         descriptor = "TIMEBASE · CONTROL · DETAIL",
+    ),
+    CRYSTAL_ATRIUM(
+        storageKey = "crystal-atrium",
+        displayName = "Crystal Atrium",
+        descriptor = "LIGHT · CLARITY · SUSPENSION",
     );
 
     companion object {
@@ -37,7 +42,11 @@ enum class DisplayDesign(
 
 enum class ColorPalette(val storageKey: String, val displayName: String) {
     HIFI_GREEN("green", "Hi-Fi Green"),
-    WARM_AMBER("amber", "Warm Amber");
+    WARM_AMBER("amber", "Warm Amber"),
+    ARCTIC_SILVER("arctic-silver", "Arctic Silver"),
+    COBALT_NIGHT("cobalt-night", "Cobalt Night"),
+    VELVET_VIOLET("velvet-violet", "Velvet Violet"),
+    RUBY_SIGNAL("ruby-signal", "Ruby Signal");
 
     companion object {
         fun fromStorage(value: String?): ColorPalette =
@@ -143,5 +152,37 @@ internal val ColorPalette.colors: DisplayColors
             primaryText = Color(0xFFFFF4E2),
             secondaryText = Color(0xFFAA9780),
             accent = Color(0xFFFFBC57),
+        )
+        ColorPalette.ARCTIC_SILVER -> DisplayColors(
+            background = Color(0xFF090C10),
+            surface = Color(0xFF11171D),
+            surfaceRaised = Color(0xFF222D36),
+            primaryText = Color(0xFFF4F8FA),
+            secondaryText = Color(0xFF95A4AE),
+            accent = Color(0xFFD8F1F5),
+        )
+        ColorPalette.COBALT_NIGHT -> DisplayColors(
+            background = Color(0xFF070A12),
+            surface = Color(0xFF0D1423),
+            surfaceRaised = Color(0xFF172A46),
+            primaryText = Color(0xFFF1F5FF),
+            secondaryText = Color(0xFF8799B7),
+            accent = Color(0xFF75B9FF),
+        )
+        ColorPalette.VELVET_VIOLET -> DisplayColors(
+            background = Color(0xFF0B0810),
+            surface = Color(0xFF17101E),
+            surfaceRaised = Color(0xFF2C1E37),
+            primaryText = Color(0xFFF9F2FC),
+            secondaryText = Color(0xFFA593AB),
+            accent = Color(0xFFD8A5F4),
+        )
+        ColorPalette.RUBY_SIGNAL -> DisplayColors(
+            background = Color(0xFF0D0809),
+            surface = Color(0xFF1A1012),
+            surfaceRaised = Color(0xFF332025),
+            primaryText = Color(0xFFFFF3F4),
+            secondaryText = Color(0xFFAD9297),
+            accent = Color(0xFFFF7F91),
         )
     }

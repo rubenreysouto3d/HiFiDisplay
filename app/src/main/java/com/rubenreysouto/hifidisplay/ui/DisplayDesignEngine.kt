@@ -14,6 +14,7 @@ internal enum class ArtworkTreatment {
     STUDIO_DECK,
     MONOLITH_GLASS,
     PRECISION_DIAL,
+    CRYSTAL_FLOAT,
 }
 
 internal enum class ProgressTreatment {
@@ -21,6 +22,7 @@ internal enum class ProgressTreatment {
     TICKED,
     LUMINOUS,
     SEGMENTED,
+    PRISMATIC,
 }
 
 internal enum class ControlTreatment {
@@ -28,6 +30,7 @@ internal enum class ControlTreatment {
     CONSOLE,
     GLASS,
     MACHINED,
+    FLOATING_GLASS,
 }
 
 internal enum class DisplayLayoutMode {
@@ -97,6 +100,18 @@ internal val DisplayDesign.tokens: DisplayDesignTokens
             contentGap = 42.dp,
             artworkCornerRadius = 4.dp,
             sourceCornerRadius = 3.dp,
+        )
+
+        DisplayDesign.CRYSTAL_ATRIUM -> DisplayDesignTokens(
+            artworkPlacement = ArtworkPlacement.LEADING,
+            artworkTreatment = ArtworkTreatment.CRYSTAL_FLOAT,
+            progressTreatment = ProgressTreatment.PRISMATIC,
+            controlTreatment = ControlTreatment.FLOATING_GLASS,
+            horizontalPadding = 28.dp,
+            verticalPadding = 22.dp,
+            contentGap = 30.dp,
+            artworkCornerRadius = 22.dp,
+            sourceCornerRadius = 18.dp,
         )
     }
 
