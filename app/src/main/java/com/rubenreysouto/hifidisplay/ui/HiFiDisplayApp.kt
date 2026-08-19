@@ -40,7 +40,7 @@ private val Accent: Color @Composable get() = MaterialTheme.colorScheme.primary
 @Composable
 fun HiFiDisplayApp(
     state: MediaUiState,
-    skin: DisplaySkin,
+    appearance: DisplayAppearance,
     onOpenAccessSettings: () -> Unit,
     onPlay: () -> Unit,
     onPause: () -> Unit,
@@ -48,21 +48,21 @@ fun HiFiDisplayApp(
     onNext: () -> Unit,
     onSeek: (Long) -> Unit,
     onSelectSource: (String?) -> Unit,
-    onSelectSkin: (DisplaySkin) -> Unit,
+    onSelectPalette: (ColorPalette) -> Unit,
 ) {
-    val palette = skin.palette
+    val colors = appearance.palette.colors
     var showSourcePicker by remember { mutableStateOf(false) }
     var showDiagnostics by remember { mutableStateOf(false) }
     MaterialTheme(
         colorScheme = darkColorScheme(
-            background = palette.background,
-            surface = palette.surface,
-            surfaceVariant = palette.surfaceRaised,
-            onBackground = palette.primaryText,
-            onSurface = palette.primaryText,
-            onSurfaceVariant = palette.secondaryText,
-            primary = palette.accent,
-            onPrimary = palette.background,
+            background = colors.background,
+            surface = colors.surface,
+            surfaceVariant = colors.surfaceRaised,
+            onBackground = colors.primaryText,
+            onSurface = colors.primaryText,
+            onSurfaceVariant = colors.secondaryText,
+            primary = colors.accent,
+            onPrimary = colors.background,
         ),
     ) {
         Surface(modifier = Modifier.fillMaxSize(), color = Background) {
@@ -89,12 +89,12 @@ fun HiFiDisplayApp(
                 if (showSourcePicker) {
                     SourcePickerOverlay(
                         state = state,
-                        skin = skin,
+                        appearance = appearance,
                         onSelectSource = {
                             onSelectSource(it)
                             showSourcePicker = false
                         },
-                        onSelectSkin = onSelectSkin,
+                        onSelectPalette = onSelectPalette,
                         onShowDiagnostics = {
                             showSourcePicker = false
                             showDiagnostics = true
@@ -124,7 +124,7 @@ private fun DisplayMenuButton(modifier: Modifier = Modifier, onClick: () -> Unit
         Icon(Icons.Rounded.Tune, null, tint = Accent, modifier = Modifier.size(16.dp))
         Spacer(Modifier.width(8.dp))
         Text(
-            "SOURCE / SKIN",
+            "SOURCE / DISPLAY",
             color = PrimaryText,
             fontSize = 10.sp,
             fontFamily = FontFamily.Monospace,
@@ -272,9 +272,9 @@ private fun SourceHeader(
 @Composable
 private fun SourcePickerOverlay(
     state: MediaUiState,
-    skin: DisplaySkin,
+    appearance: DisplayAppearance,
     onSelectSource: (String?) -> Unit,
-    onSelectSkin: (DisplaySkin) -> Unit,
+    onSelectPalette: (ColorPalette) -> Unit,
     onShowDiagnostics: () -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -287,7 +287,7 @@ private fun SourcePickerOverlay(
         Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    "SOURCE / SKIN",
+                    "SOURCE / DISPLAY",
                     color = Accent,
                     fontSize = 13.sp,
                     fontFamily = FontFamily.Monospace,
@@ -341,14 +341,21 @@ private fun SourcePickerOverlay(
                 )
             }
             Spacer(Modifier.height(22.dp))
-            Text("SKIN", color = SecondaryText, fontSize = 10.sp, fontFamily = FontFamily.Monospace, letterSpacing = 1.5.sp)
+            Text("DESIGN", color = SecondaryText, fontSize = 10.sp, fontFamily = FontFamily.Monospace, letterSpacing = 1.5.sp)
             Spacer(Modifier.height(7.dp))
-            DisplaySkin.entries.forEach { option ->
+            AppearanceInfoRow(
+                title = appearance.design.displayName,
+                subtitle = "STRUCTURE · TYPOGRAPHY · INTERACTION",
+            )
+            Spacer(Modifier.height(22.dp))
+            Text("PALETTE", color = SecondaryText, fontSize = 10.sp, fontFamily = FontFamily.Monospace, letterSpacing = 1.5.sp)
+            Spacer(Modifier.height(7.dp))
+            ColorPalette.entries.forEach { option ->
                 PickerRow(
                     title = option.displayName,
                     subtitle = option.storageKey.uppercase(),
-                    selected = skin == option,
-                    onClick = { onSelectSkin(option) },
+                    selected = appearance.palette == option,
+                    onClick = { onSelectPalette(option) },
                 )
             }
             Spacer(Modifier.height(22.dp))
@@ -362,6 +369,27 @@ private fun SourcePickerOverlay(
                 onClick = onShowDiagnostics,
             )
         }
+    }
+}
+
+@Composable
+private fun AppearanceInfoRow(title: String, subtitle: String) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 48.dp)
+            .clip(RoundedCornerShape(4.dp))
+            .background(SurfaceRaised.copy(alpha = .45f))
+            .padding(horizontal = 14.dp, vertical = 9.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(Modifier.size(7.dp).clip(CircleShape).background(Accent))
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f)) {
+            Text(title, color = PrimaryText, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(subtitle, color = SecondaryText, fontSize = 9.sp, fontFamily = FontFamily.Monospace, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+        Text("ACTIVE", color = Accent, fontSize = 9.sp, fontFamily = FontFamily.Monospace)
     }
 }
 
