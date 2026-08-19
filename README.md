@@ -38,3 +38,7 @@ Suggested device compatibility pass:
 | YouTube Music | ☐ | ☐ | ☐ | ☐ | ☐ |
 | Poweramp | ☐ | ☐ | ☐ | ☐ | ☐ |
 | Other player | ☐ | ☐ | ☐ | ☐ | ☐ |
+
+## v0.5 sources and appearance
+
+Use the always-visible `SOURCE / DISPLAY` button to choose automatic session following or pin a specific active media app, even when no session is playing. Display design and color palette are independent: `Modern Reference` currently defines structure, typography, and interaction, while `Hi-Fi Green` and `Warm Amber` are interchangeable palettes. Preferences persist across launches and migrate the earlier skin setting automatically. Session diagnostics is also an explicit tool in this panel.

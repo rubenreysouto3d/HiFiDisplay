@@ -24,8 +24,10 @@ class MainActivity : ComponentActivity() {
         enterImmersiveMode()
         setContent {
             val state = viewModel.state.collectAsStateWithLifecycle().value
+            val appearance = viewModel.appearance.collectAsStateWithLifecycle().value
             HiFiDisplayApp(
                 state = state,
+                appearance = appearance,
                 onOpenAccessSettings = {
                     startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
                 },
@@ -34,6 +36,8 @@ class MainActivity : ComponentActivity() {
                 onPrevious = viewModel::previous,
                 onNext = viewModel::next,
                 onSeek = viewModel::seekTo,
+                onSelectSource = viewModel::selectSource,
+                onSelectPalette = viewModel::selectPalette,
             )
         }
     }
