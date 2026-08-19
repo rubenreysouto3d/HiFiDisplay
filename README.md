@@ -42,3 +42,7 @@ Suggested device compatibility pass:
 ## v0.5 sources and appearance
 
 Use the always-visible `SOURCE / DISPLAY` button to choose automatic session following or pin a specific active media app, even when no session is playing. Display design and color palette are independent: `Modern Reference` currently defines structure, typography, and interaction, while `Hi-Fi Green` and `Warm Amber` are interchangeable palettes. Preferences persist across launches and migrate the earlier skin setting automatically. Session diagnostics is also an explicit tool in this panel.
+
+## v0.6 ambient interaction
+
+During active playback, controls and the `SOURCE / DISPLAY` entry fade away after six seconds to leave a clean Hi-Fi display. Tap anywhere to reveal them; using a transport control or seeking restarts the interval. Artwork, metadata, times, and a thin live progress line remain visible, and the layout keeps its dimensions while controls fade so the display never jumps. Configuration remains permanently visible on permission, error, and no-session screens.

@@ -1,9 +1,14 @@
 package com.rubenreysouto.hifidisplay.ui
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -28,6 +33,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.rubenreysouto.hifidisplay.media.MediaUiState
 import com.rubenreysouto.hifidisplay.media.SessionAvailability
+import kotlinx.coroutines.delay
 import kotlin.math.roundToLong
 
 private val Background: Color @Composable get() = MaterialTheme.colorScheme.background
@@ -53,6 +59,22 @@ fun HiFiDisplayApp(
     val colors = appearance.palette.colors
     var showSourcePicker by remember { mutableStateOf(false) }
     var showDiagnostics by remember { mutableStateOf(false) }
+    var interaction by remember { mutableStateOf(AmbientInteractionState()) }
+    val activeDisplay = state.availability == SessionAvailability.ACTIVE
+    fun dispatch(event: AmbientInteractionEvent) {
+        interaction = interaction.reduce(event)
+    }
+    LaunchedEffect(
+        activeDisplay,
+        interaction.controlsVisible,
+        interaction.overlayOpen,
+        interaction.interactionId,
+    ) {
+        if (activeDisplay && interaction.controlsVisible && !interaction.overlayOpen) {
+            delay(CONTROLS_TIMEOUT_MS)
+            dispatch(AmbientInteractionEvent.TIMEOUT)
+        }
+    }
     MaterialTheme(
         colorScheme = darkColorScheme(
             background = colors.background,
@@ -78,14 +100,42 @@ fun HiFiDisplayApp(
                         onPrevious = onPrevious,
                         onNext = onNext,
                         onSeek = onSeek,
-                        onShowSources = { showSourcePicker = true },
-                        onShowDiagnostics = { showDiagnostics = true },
+                        controlsVisible = interaction.controlsVisible,
+                        onInteraction = { dispatch(AmbientInteractionEvent.INTERACT) },
+                        onShowSources = {
+                            showSourcePicker = true
+                            dispatch(AmbientInteractionEvent.OVERLAY_OPENED)
+                        },
+                        onShowDiagnostics = {
+                            showDiagnostics = true
+                            dispatch(AmbientInteractionEvent.OVERLAY_OPENED)
+                        },
                     )
                 }
-                DisplayMenuButton(
-                    modifier = Modifier.align(Alignment.TopEnd).padding(top = 18.dp, end = 22.dp),
-                    onClick = { showSourcePicker = true },
-                )
+                AnimatedVisibility(
+                    visible = !activeDisplay || interaction.controlsVisible,
+                    enter = fadeIn(tween(180)),
+                    exit = fadeOut(tween(260)),
+                    modifier = Modifier.align(Alignment.TopEnd),
+                ) {
+                    DisplayMenuButton(
+                        modifier = Modifier.padding(top = 18.dp, end = 22.dp),
+                        onClick = {
+                            showSourcePicker = true
+                            dispatch(AmbientInteractionEvent.OVERLAY_OPENED)
+                        },
+                    )
+                }
+                if (activeDisplay && !interaction.controlsVisible) {
+                    Box(
+                        Modifier
+                            .fillMaxSize()
+                            .clickable(
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = null,
+                            ) { dispatch(AmbientInteractionEvent.INTERACT) },
+                    )
+                }
                 if (showSourcePicker) {
                     SourcePickerOverlay(
                         state = state,
@@ -93,17 +143,28 @@ fun HiFiDisplayApp(
                         onSelectSource = {
                             onSelectSource(it)
                             showSourcePicker = false
+                            dispatch(AmbientInteractionEvent.OVERLAY_CLOSED)
                         },
                         onSelectPalette = onSelectPalette,
                         onShowDiagnostics = {
                             showSourcePicker = false
                             showDiagnostics = true
+                            dispatch(AmbientInteractionEvent.OVERLAY_OPENED)
                         },
-                        onDismiss = { showSourcePicker = false },
+                        onDismiss = {
+                            showSourcePicker = false
+                            dispatch(AmbientInteractionEvent.OVERLAY_CLOSED)
+                        },
                     )
                 }
                 if (showDiagnostics) {
-                    DiagnosticsOverlay(state, onDismiss = { showDiagnostics = false })
+                    DiagnosticsOverlay(
+                        state,
+                        onDismiss = {
+                            showDiagnostics = false
+                            dispatch(AmbientInteractionEvent.OVERLAY_CLOSED)
+                        },
+                    )
                 }
             }
         }
@@ -201,6 +262,8 @@ private fun NowPlaying(
     onPrevious: () -> Unit,
     onNext: () -> Unit,
     onSeek: (Long) -> Unit,
+    controlsVisible: Boolean,
+    onInteraction: () -> Unit,
     onShowSources: () -> Unit,
     onShowDiagnostics: () -> Unit,
 ) {
@@ -210,6 +273,7 @@ private fun NowPlaying(
             Column(Modifier.weight(1f).fillMaxHeight()) {
                 SourceHeader(
                     state = state,
+                    controlsVisible = controlsVisible,
                     onShowSources = onShowSources,
                     onShowDiagnostics = onShowDiagnostics,
                 )
@@ -221,9 +285,17 @@ private fun NowPlaying(
                     Text(it.uppercase(), color = SecondaryText.copy(alpha = .65f), fontSize = 12.sp, fontFamily = FontFamily.Monospace, letterSpacing = 1.2.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
                 Spacer(Modifier.weight(1f))
-                PlayerControls(state, onPlay, onPause, onPrevious, onNext)
+                PlayerControls(
+                    state = state,
+                    visible = controlsVisible,
+                    onInteraction = onInteraction,
+                    onPlay = onPlay,
+                    onPause = onPause,
+                    onPrevious = onPrevious,
+                    onNext = onNext,
+                )
                 Spacer(Modifier.height(20.dp))
-                Progress(state, onSeek)
+                Progress(state, controlsVisible, onInteraction, onSeek)
             }
         }
     }
@@ -232,6 +304,7 @@ private fun NowPlaying(
 @Composable
 private fun SourceHeader(
     state: MediaUiState,
+    controlsVisible: Boolean,
     onShowSources: () -> Unit,
     onShowDiagnostics: () -> Unit,
 ) {
@@ -239,12 +312,16 @@ private fun SourceHeader(
         modifier = Modifier
             .heightIn(min = 48.dp)
             .widthIn(max = 260.dp)
-            .pointerInput(Unit) {
-                detectTapGestures(
-                    onTap = { onShowSources() },
-                    onLongPress = { onShowDiagnostics() },
-                )
-            },
+            .then(
+                if (controlsVisible) {
+                    Modifier.pointerInput(Unit) {
+                        detectTapGestures(
+                            onTap = { onShowSources() },
+                            onLongPress = { onShowDiagnostics() },
+                        )
+                    }
+                } else Modifier,
+            ),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(
@@ -264,8 +341,12 @@ private fun SourceHeader(
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f),
         )
-        Spacer(Modifier.width(5.dp))
-        Icon(Icons.Rounded.ExpandMore, "Cambiar fuente", tint = SecondaryText, modifier = Modifier.size(16.dp))
+        AnimatedVisibility(visible = controlsVisible, enter = fadeIn(), exit = fadeOut()) {
+            Row {
+                Spacer(Modifier.width(5.dp))
+                Icon(Icons.Rounded.ExpandMore, "Cambiar fuente", tint = SecondaryText, modifier = Modifier.size(16.dp))
+            }
+        }
     }
 }
 
@@ -517,21 +598,39 @@ private fun Artwork(state: MediaUiState, modifier: Modifier) {
 }
 
 @Composable
-private fun PlayerControls(state: MediaUiState, onPlay: () -> Unit, onPause: () -> Unit, onPrevious: () -> Unit, onNext: () -> Unit) {
+private fun PlayerControls(
+    state: MediaUiState,
+    visible: Boolean,
+    onInteraction: () -> Unit,
+    onPlay: () -> Unit,
+    onPause: () -> Unit,
+    onPrevious: () -> Unit,
+    onNext: () -> Unit,
+) {
     val hasPrimaryControl = if (state.isPlaying) state.canPause else state.canPlay
     val hasAnyControl = state.canSkipPrevious || hasPrimaryControl || state.canSkipNext
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(24.dp, Alignment.CenterHorizontally),
+    Box(
+        modifier = Modifier.fillMaxWidth().height(68.dp),
+        contentAlignment = Alignment.Center,
     ) {
-        if (!hasAnyControl) {
-            Text("CONTROLES NO DISPONIBLES", color = SecondaryText, fontSize = 10.sp, fontFamily = FontFamily.Monospace, letterSpacing = 1.2.sp)
-        } else {
-            if (state.canSkipPrevious) ControlButton(Icons.Rounded.SkipPrevious, onPrevious, "Anterior")
-            if (state.isPlaying && state.canPause) ControlButton(Icons.Rounded.Pause, onPause, "Pausa", true)
-            else if (!state.isPlaying && state.canPlay) ControlButton(Icons.Rounded.PlayArrow, onPlay, "Reproducir", true)
-            if (state.canSkipNext) ControlButton(Icons.Rounded.SkipNext, onNext, "Siguiente")
+        AnimatedVisibility(
+            visible = visible,
+            enter = fadeIn(tween(180)),
+            exit = fadeOut(tween(260)),
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(24.dp, Alignment.CenterHorizontally),
+            ) {
+                if (!hasAnyControl) {
+                    Text("CONTROLES NO DISPONIBLES", color = SecondaryText, fontSize = 10.sp, fontFamily = FontFamily.Monospace, letterSpacing = 1.2.sp)
+                } else {
+                    if (state.canSkipPrevious) ControlButton(Icons.Rounded.SkipPrevious, { onInteraction(); onPrevious() }, "Anterior")
+                    if (state.isPlaying && state.canPause) ControlButton(Icons.Rounded.Pause, { onInteraction(); onPause() }, "Pausa", true)
+                    else if (!state.isPlaying && state.canPlay) ControlButton(Icons.Rounded.PlayArrow, { onInteraction(); onPlay() }, "Reproducir", true)
+                    if (state.canSkipNext) ControlButton(Icons.Rounded.SkipNext, { onInteraction(); onNext() }, "Siguiente")
+                }
+            }
         }
     }
 }
@@ -549,29 +648,58 @@ private fun ControlButton(icon: androidx.compose.ui.graphics.vector.ImageVector,
 }
 
 @Composable
-private fun Progress(state: MediaUiState, onSeek: (Long) -> Unit) {
+private fun Progress(
+    state: MediaUiState,
+    controlsVisible: Boolean,
+    onInteraction: () -> Unit,
+    onSeek: (Long) -> Unit,
+) {
     val duration = state.durationMs
     var dragValue by remember { mutableStateOf<Float?>(null) }
     val progress = dragValue ?: if (duration != null && duration > 0) state.positionMs.toFloat() / duration else 0f
-    Slider(
-        value = progress.coerceIn(0f, 1f),
-        onValueChange = if (state.canSeek && duration != null) ({ dragValue = it }) else ({ }),
-        onValueChangeFinished = {
-            val value = dragValue
-            if (value != null && duration != null) onSeek((value * duration).roundToLong())
-            dragValue = null
-        },
-        enabled = state.canSeek && duration != null,
-        colors = SliderDefaults.colors(
-            thumbColor = Accent, activeTrackColor = Accent, inactiveTrackColor = SecondaryText.copy(alpha = .25f),
-            disabledThumbColor = SecondaryText, disabledActiveTrackColor = SecondaryText.copy(alpha = .45f),
-        ),
-    )
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-        Text(formatTime(state.positionMs), color = SecondaryText, fontSize = 11.sp, fontFamily = FontFamily.Monospace)
-        Text(duration?.let(::formatTime) ?: "--:--", color = SecondaryText, fontSize = 11.sp, fontFamily = FontFamily.Monospace)
+    Column(Modifier.fillMaxWidth().height(64.dp)) {
+        Box(Modifier.fillMaxWidth().height(48.dp), contentAlignment = Alignment.Center) {
+            if (controlsVisible) {
+                Slider(
+                    value = progress.coerceIn(0f, 1f),
+                    onValueChange = if (state.canSeek && duration != null) ({ onInteraction(); dragValue = it }) else ({ }),
+                    onValueChangeFinished = {
+                        val value = dragValue
+                        if (value != null && duration != null) onSeek((value * duration).roundToLong())
+                        dragValue = null
+                        onInteraction()
+                    },
+                    enabled = state.canSeek && duration != null,
+                    colors = SliderDefaults.colors(
+                        thumbColor = Accent, activeTrackColor = Accent, inactiveTrackColor = SecondaryText.copy(alpha = .25f),
+                        disabledThumbColor = SecondaryText, disabledActiveTrackColor = SecondaryText.copy(alpha = .45f),
+                    ),
+                )
+            } else {
+                Box(
+                    Modifier
+                        .fillMaxWidth()
+                        .height(2.dp)
+                        .clip(CircleShape)
+                        .background(SecondaryText.copy(alpha = .18f)),
+                ) {
+                    Box(
+                        Modifier
+                            .fillMaxWidth(progress.coerceIn(0f, 1f))
+                            .fillMaxHeight()
+                            .background(Accent.copy(alpha = .82f)),
+                    )
+                }
+            }
+        }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Text(formatTime(state.positionMs), color = SecondaryText, fontSize = 11.sp, fontFamily = FontFamily.Monospace)
+            Text(duration?.let(::formatTime) ?: "--:--", color = SecondaryText, fontSize = 11.sp, fontFamily = FontFamily.Monospace)
+        }
     }
 }
+
+private const val CONTROLS_TIMEOUT_MS = 6_000L
 
 private fun formatTime(milliseconds: Long): String {
     val seconds = milliseconds.coerceAtLeast(0L) / 1_000L
