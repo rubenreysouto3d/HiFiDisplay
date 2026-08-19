@@ -3,6 +3,7 @@ package com.rubenreysouto.hifidisplay.ui
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -14,7 +15,9 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.drag
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
@@ -271,13 +274,9 @@ private fun NowPlaying(
         }
     }
     val burnInOffset = BURN_IN_OFFSETS[burnInStep]
-    Box(
-        Modifier
-            .fillMaxSize()
-            .pointerInput(onInteraction) {
-                detectTapGestures(onTap = { onInteraction() })
-            },
-    ) {
+    val artworkInteraction = remember { MutableInteractionSource() }
+    val metadataInteraction = remember { MutableInteractionSource() }
+    Box(Modifier.fillMaxSize()) {
         BoxWithConstraints(Modifier.fillMaxSize()) {
             val compactHeight = maxHeight < 300.dp
             val horizontalPadding = if (maxWidth < 720.dp) 24.dp else 36.dp
@@ -290,7 +289,17 @@ private fun NowPlaying(
                     .padding(horizontal = horizontalPadding, vertical = verticalPadding),
                 horizontalArrangement = Arrangement.spacedBy(contentGap),
             ) {
-                Artwork(state, Modifier.fillMaxHeight().aspectRatio(1f))
+                Artwork(
+                    state,
+                    Modifier
+                        .fillMaxHeight()
+                        .aspectRatio(1f)
+                        .clickable(
+                            interactionSource = artworkInteraction,
+                            indication = null,
+                            onClick = onInteraction,
+                        ),
+                )
                 BoxWithConstraints(Modifier.weight(1f).fillMaxHeight()) {
                     val compactWidth = maxWidth < 400.dp
                     val compact = compactHeight || compactWidth
@@ -301,7 +310,9 @@ private fun NowPlaying(
                         ) {
                             SourceHeader(
                                 state = state,
-                                modifier = Modifier.weight(1f).widthIn(max = 240.dp),
+                                modifier = Modifier
+                                    .weight(1f, fill = false)
+                                    .widthIn(max = if (compact) 170.dp else 220.dp),
                                 onShowSources = onShowSources,
                                 onShowDiagnostics = onShowDiagnostics,
                             )
@@ -320,7 +331,14 @@ private fun NowPlaying(
                         TrackMetadata(
                             state = state,
                             compact = compact,
-                            modifier = Modifier.weight(1f).fillMaxWidth(),
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxWidth()
+                                .clickable(
+                                    interactionSource = metadataInteraction,
+                                    indication = null,
+                                    onClick = onInteraction,
+                                ),
                         )
                         Progress(state, controlsVisible, onInteraction, onSeek)
                     }
@@ -844,34 +862,27 @@ private fun Progress(
     val duration = state.durationMs
     var dragValue by remember { mutableStateOf<Float?>(null) }
     val progress = dragValue ?: if (duration != null && duration > 0) state.positionMs.toFloat() / duration else 0f
-    Column(Modifier.fillMaxWidth().height(64.dp)) {
-        Box(Modifier.fillMaxWidth().height(48.dp), contentAlignment = Alignment.Center) {
-            Crossfade(
-                targetState = controlsVisible,
-                animationSpec = tween(200),
-                label = "progress interaction",
-            ) { interactive ->
-                if (interactive) {
-                    Slider(
-                        value = progress.coerceIn(0f, 1f),
-                        onValueChange = if (state.canSeek && duration != null) ({ onInteraction(); dragValue = it }) else ({ }),
-                        onValueChangeFinished = {
-                            val value = dragValue
-                            if (value != null && duration != null) onSeek((value * duration).roundToLong())
-                            dragValue = null
-                            onInteraction()
-                        },
-                        enabled = state.canSeek && duration != null,
-                        colors = SliderDefaults.colors(
-                            thumbColor = Accent, activeTrackColor = Accent, inactiveTrackColor = SecondaryText.copy(alpha = .25f),
-                            disabledThumbColor = SecondaryText, disabledActiveTrackColor = SecondaryText.copy(alpha = .45f),
-                        ),
-                    )
-                } else {
-                    AmbientProgressTrack(progress = progress)
-                }
-            }
-        }
+    val revealModifier = if (controlsVisible) Modifier else Modifier.clickable(
+        interactionSource = remember { MutableInteractionSource() },
+        indication = null,
+        onClick = onInteraction,
+    )
+    Column(Modifier.fillMaxWidth().height(64.dp).then(revealModifier)) {
+        PremiumSeekBar(
+            progress = progress,
+            interactive = controlsVisible,
+            enabled = state.canSeek && duration != null,
+            onValueChange = {
+                onInteraction()
+                dragValue = it
+            },
+            onValueChangeFinished = {
+                val value = dragValue
+                if (value != null && duration != null) onSeek((value * duration).roundToLong())
+                dragValue = null
+                onInteraction()
+            },
+        )
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Text(formatTime(state.positionMs), color = SecondaryText, fontSize = 11.sp, fontFamily = FontFamily.Monospace)
             Text(duration?.let(::formatTime) ?: "--:--", color = SecondaryText, fontSize = 11.sp, fontFamily = FontFamily.Monospace)
@@ -880,19 +891,70 @@ private fun Progress(
 }
 
 @Composable
-private fun AmbientProgressTrack(progress: Float) {
-    Box(
+private fun PremiumSeekBar(
+    progress: Float,
+    interactive: Boolean,
+    enabled: Boolean,
+    onValueChange: (Float) -> Unit,
+    onValueChangeFinished: () -> Unit,
+) {
+    val fraction = progress.coerceIn(0f, 1f)
+    val activeHeight by animateDpAsState(
+        targetValue = if (interactive) 3.dp else 2.dp,
+        animationSpec = tween(180),
+        label = "seek track height",
+    )
+    val thumbScale by animateFloatAsState(
+        targetValue = if (interactive && enabled) 1f else 0f,
+        animationSpec = tween(160),
+        label = "seek thumb",
+    )
+    val gestureModifier = if (interactive && enabled) {
+        Modifier.pointerInput(onValueChange, onValueChangeFinished) {
+            awaitEachGesture {
+                val down = awaitFirstDown()
+                onValueChange((down.position.x / size.width).coerceIn(0f, 1f))
+                drag(down.id) { change ->
+                    change.consume()
+                    onValueChange((change.position.x / size.width).coerceIn(0f, 1f))
+                }
+                onValueChangeFinished()
+            }
+        }
+    } else Modifier
+    BoxWithConstraints(
         Modifier
             .fillMaxWidth()
-            .height(2.dp)
-            .clip(CircleShape)
-            .background(SecondaryText.copy(alpha = .18f)),
+            .height(48.dp)
+            .then(gestureModifier),
+        contentAlignment = Alignment.CenterStart,
     ) {
         Box(
             Modifier
-                .fillMaxWidth(progress.coerceIn(0f, 1f))
-                .fillMaxHeight()
-                .background(Accent.copy(alpha = .82f)),
+                .fillMaxWidth()
+                .height(2.dp)
+                .clip(CircleShape)
+                .background(SecondaryText.copy(alpha = .18f)),
+        )
+        Box(
+            Modifier
+                .fillMaxWidth(fraction)
+                .height(activeHeight)
+                .clip(CircleShape)
+                .background(Accent.copy(alpha = if (enabled) .86f else .46f)),
+        )
+        val thumbSize = 12.dp
+        Box(
+            Modifier
+                .offset(x = (maxWidth - thumbSize) * fraction)
+                .size(thumbSize)
+                .graphicsLayer {
+                    scaleX = thumbScale
+                    scaleY = thumbScale
+                }
+                .clip(CircleShape)
+                .background(Accent)
+                .border(2.dp, Background, CircleShape),
         )
     }
 }
