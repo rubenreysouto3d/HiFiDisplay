@@ -50,6 +50,11 @@ enum class ArtworkMotion(
         displayName = "Dissolve",
         descriptor = "CLEAN CROSSFADE · NO SCALE",
     ),
+    DECK(
+        storageKey = "deck",
+        displayName = "Deck",
+        descriptor = "DEFINED SLIDE · PHYSICAL CHANGEOVER",
+    ),
     DIRECT(
         storageKey = "direct",
         displayName = "Direct",

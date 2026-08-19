@@ -14,6 +14,9 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -131,7 +134,8 @@ fun HiFiDisplayApp(
                         onNext = onNext,
                         onSeek = onSeek,
                         controlsVisible = interaction.controlsVisible,
-                        onInteraction = { dispatch(AmbientInteractionEvent.INTERACT) },
+                        onToggleControls = { dispatch(AmbientInteractionEvent.TOGGLE_CONTROLS) },
+                        onKeepAlive = { dispatch(AmbientInteractionEvent.KEEP_ALIVE) },
                         onShowSources = {
                             showSourcePicker = true
                             dispatch(AmbientInteractionEvent.OVERLAY_OPENED)
@@ -292,7 +296,8 @@ private fun NowPlaying(
     onNext: () -> Unit,
     onSeek: (Long) -> Unit,
     controlsVisible: Boolean,
-    onInteraction: () -> Unit,
+    onToggleControls: () -> Unit,
+    onKeepAlive: () -> Unit,
     onShowSources: () -> Unit,
     onShowDiagnostics: () -> Unit,
 ) {
@@ -315,7 +320,8 @@ private fun NowPlaying(
             artworkMotion = artworkMotion,
             burnInOffset = burnInOffset,
             controlsVisible = controlsVisible,
-            onInteraction = onInteraction,
+            onToggleControls = onToggleControls,
+            onKeepAlive = onKeepAlive,
             onShowSources = onShowSources,
             onShowDiagnostics = onShowDiagnostics,
             onPlay = onPlay,
@@ -334,7 +340,8 @@ private fun PlaybackSkinLayout(
     artworkMotion: ArtworkMotion,
     burnInOffset: Pair<Int, Int>,
     controlsVisible: Boolean,
-    onInteraction: () -> Unit,
+    onToggleControls: () -> Unit,
+    onKeepAlive: () -> Unit,
     onShowSources: () -> Unit,
     onShowDiagnostics: () -> Unit,
     onPlay: () -> Unit,
@@ -359,6 +366,23 @@ private fun PlaybackSkinLayout(
         label = "metadata touch",
     )
     val view = LocalView.current
+    var controlCue by remember { mutableStateOf<ControlCue?>(null) }
+    var controlCueId by remember { mutableLongStateOf(0L) }
+    LaunchedEffect(controlCueId) {
+        if (controlCueId == 0L) return@LaunchedEffect
+        delay(CONTROL_CUE_DURATION_MS)
+        controlCue = controlCue?.copy(visible = false)
+        delay(CONTROL_CUE_EXIT_MS)
+        controlCue = null
+    }
+    fun toggleControls() {
+        controlCueId += 1L
+        controlCue = ControlCue(
+            showsControls = !controlsVisible,
+            visible = true,
+        )
+        onToggleControls()
+    }
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val layoutMode = resolveDisplayLayoutMode(maxWidth.value, maxHeight.value)
         val compact = layoutMode == DisplayLayoutMode.COMPACT
@@ -385,6 +409,7 @@ private fun PlaybackSkinLayout(
                     design = design,
                     motion = artworkMotion,
                     pressed = artworkPressed,
+                    controlCue = controlCue,
                     modifier = Modifier
                         .fillMaxHeight()
                         .aspectRatio(1f)
@@ -394,7 +419,7 @@ private fun PlaybackSkinLayout(
                             indication = null,
                             onClick = {
                                 view.performPremiumHaptic()
-                                onInteraction()
+                                toggleControls()
                             },
                         ),
                 )
@@ -405,7 +430,7 @@ private fun PlaybackSkinLayout(
                 design = design,
                 compact = compact,
                 controlsVisible = controlsVisible,
-                onInteraction = onInteraction,
+                onInteraction = onKeepAlive,
                 onShowSources = onShowSources,
                 onShowDiagnostics = onShowDiagnostics,
                 onPlay = onPlay,
@@ -422,7 +447,7 @@ private fun PlaybackSkinLayout(
                         indication = null,
                         onClick = {
                             view.performPremiumHaptic()
-                            onInteraction()
+                            toggleControls()
                         },
                     ),
                 modifier = Modifier.weight(1f).fillMaxHeight(),
@@ -434,6 +459,7 @@ private fun PlaybackSkinLayout(
                     design = design,
                     motion = artworkMotion,
                     pressed = artworkPressed,
+                    controlCue = controlCue,
                     modifier = Modifier
                         .fillMaxHeight()
                         .aspectRatio(1f)
@@ -443,7 +469,7 @@ private fun PlaybackSkinLayout(
                             indication = null,
                             onClick = {
                                 view.performPremiumHaptic()
-                                onInteraction()
+                                toggleControls()
                             },
                         ),
                 )
@@ -481,7 +507,7 @@ private fun PlaybackInformation(
                 design = design,
                 modifier = Modifier
                     .weight(1f, fill = false)
-                    .widthIn(max = if (compact) 170.dp else 220.dp),
+                    .widthIn(max = if (compact) 148.dp else 176.dp),
                 onShowSources = onShowSources,
                 onShowDiagnostics = onShowDiagnostics,
             )
@@ -676,19 +702,19 @@ private fun SourceHeader(
     val view = LocalView.current
     val container by animateColorAsState(
         targetValue = when {
-            pressed -> SurfaceRaised.copy(alpha = .8f)
-            studio -> SurfaceRaised.copy(alpha = .18f)
-            else -> SurfaceRaised.copy(alpha = .34f)
+            pressed -> Accent.copy(alpha = .09f)
+            studio -> SurfaceRaised.copy(alpha = .08f)
+            else -> SurfaceRaised.copy(alpha = .14f)
         },
         animationSpec = tween(120),
         label = "source press",
     )
     Row(
         modifier = modifier
-            .height(48.dp)
+            .height(40.dp)
             .clip(shape)
             .background(container)
-            .border(1.dp, if (pressed) Accent.copy(alpha = .58f) else SecondaryText.copy(alpha = .12f), shape)
+            .border(1.dp, if (pressed) Accent.copy(alpha = .46f) else SecondaryText.copy(alpha = .08f), shape)
             .combinedClickable(
                 interactionSource = interactionSource,
                 indication = null,
@@ -703,28 +729,28 @@ private fun SourceHeader(
                 },
                 onLongClickLabel = "Abrir diagnóstico",
             )
-            .padding(horizontal = 12.dp),
+            .padding(horizontal = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(
             Modifier
-                .then(if (studio) Modifier.width(3.dp).height(14.dp) else Modifier.size(7.dp))
+                .then(if (studio) Modifier.width(2.dp).height(12.dp) else Modifier.size(5.dp))
                 .clip(if (studio) RoundedCornerShape(1.dp) else CircleShape)
                 .background(if (state.isPlaying) Accent else SecondaryText.copy(alpha = .4f))
         )
-        Spacer(Modifier.width(9.dp))
+        Spacer(Modifier.width(8.dp))
         Text(
             (state.sourceApp ?: "Sesión multimedia").uppercase(),
             color = if (state.isPlaying) Accent else SecondaryText,
-            fontSize = if (studio) 10.sp else 11.sp,
+            fontSize = if (studio) 9.sp else 10.sp,
             fontFamily = FontFamily.Monospace,
-            letterSpacing = if (studio) 2.sp else 1.7.sp,
+            letterSpacing = if (studio) 1.4.sp else 1.2.sp,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f),
         )
         Spacer(Modifier.width(5.dp))
-        Icon(Icons.Rounded.ExpandMore, "Abrir opciones de fuente y display", tint = SecondaryText, modifier = Modifier.size(16.dp))
+        Icon(Icons.Rounded.ExpandMore, "Abrir opciones de fuente y display", tint = SecondaryText.copy(alpha = .78f), modifier = Modifier.size(14.dp))
     }
 }
 
@@ -739,6 +765,8 @@ private fun SourcePickerOverlay(
     onShowDiagnostics: () -> Unit,
     onDismiss: () -> Unit,
 ) {
+    var previewMotion by remember(appearance.artworkMotion) { mutableStateOf(appearance.artworkMotion) }
+    var motionPreviewId by remember { mutableLongStateOf(0L) }
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -822,13 +850,19 @@ private fun SourcePickerOverlay(
                 Spacer(Modifier.height(16.dp))
                 Text("ARTWORK MOTION", color = SecondaryText, fontSize = 10.sp, fontFamily = FontFamily.Monospace, letterSpacing = 1.5.sp)
                 Spacer(Modifier.height(7.dp))
+                ArtworkMotionPreview(previewMotion, motionPreviewId)
+                Spacer(Modifier.height(7.dp))
                 ArtworkMotion.entries.forEach { option ->
                     PickerRow(
                         title = option.displayName,
                         subtitle = option.descriptor,
                         selected = appearance.artworkMotion == option,
                         selectedLabel = "ACTIVE",
-                        onClick = { onSelectArtworkMotion(option) },
+                        onClick = {
+                            previewMotion = option
+                            motionPreviewId += 1L
+                            onSelectArtworkMotion(option)
+                        },
                     )
                 }
                 Spacer(Modifier.height(16.dp))
@@ -844,6 +878,93 @@ private fun SourcePickerOverlay(
                 Spacer(Modifier.height(12.dp))
             }
         }
+    }
+}
+
+@Composable
+private fun ArtworkMotionPreview(motion: ArtworkMotion, replayId: Long) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .height(72.dp)
+            .clip(RoundedCornerShape(4.dp))
+            .background(SurfaceRaised.copy(alpha = .18f))
+            .border(1.dp, SecondaryText.copy(alpha = .1f), RoundedCornerShape(4.dp))
+            .padding(horizontal = 14.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(motion.displayName.uppercase(), color = PrimaryText, fontSize = 11.sp, fontFamily = FontFamily.Monospace, letterSpacing = 1.2.sp)
+            Spacer(Modifier.height(3.dp))
+            Text("TAP AN EFFECT TO REPLAY", color = SecondaryText.copy(alpha = .72f), fontSize = 8.sp, fontFamily = FontFamily.Monospace, letterSpacing = .8.sp)
+        }
+        Box(
+            Modifier
+                .width(104.dp)
+                .fillMaxHeight()
+                .clip(RoundedCornerShape(2.dp))
+                .background(Surface),
+        ) {
+            MotionPreviewWindow(motion, replayId)
+        }
+    }
+}
+
+@Composable
+private fun MotionPreviewWindow(motion: ArtworkMotion, replayId: Long) {
+    when (motion) {
+        ArtworkMotion.FOCUS -> AnimatedContent(
+            targetState = replayId,
+            transitionSpec = {
+                (fadeIn(tween(durationMillis = 520, delayMillis = 40)) +
+                    scaleIn(tween(durationMillis = 720), initialScale = .94f))
+                    .togetherWith(fadeOut(tween(durationMillis = 280)))
+            },
+            label = "focus preview",
+        ) { MotionPreviewFrame(it) }
+
+        ArtworkMotion.DISSOLVE -> Crossfade(
+            targetState = replayId,
+            animationSpec = tween(620),
+            label = "dissolve preview",
+        ) { MotionPreviewFrame(it) }
+
+        ArtworkMotion.DECK -> AnimatedContent(
+            targetState = replayId,
+            transitionSpec = {
+                (fadeIn(tween(420)) + slideInHorizontally(tween(560)) { it / 8 })
+                    .togetherWith(fadeOut(tween(300)) + slideOutHorizontally(tween(480)) { -it / 12 })
+            },
+            label = "deck preview",
+        ) { MotionPreviewFrame(it) }
+
+        ArtworkMotion.DIRECT -> MotionPreviewFrame(replayId)
+    }
+}
+
+@Composable
+private fun MotionPreviewFrame(replayId: Long) {
+    val alternate = replayId % 2L != 0L
+    Box(
+        Modifier
+            .fillMaxSize()
+            .background(
+                Brush.linearGradient(
+                    if (alternate) listOf(Accent.copy(alpha = .58f), SurfaceRaised)
+                    else listOf(SurfaceRaised, Accent.copy(alpha = .3f)),
+                ),
+            )
+            .padding(8.dp),
+    ) {
+        Box(Modifier.align(Alignment.TopStart).width(if (alternate) 42.dp else 54.dp).height(3.dp).background(PrimaryText.copy(alpha = .72f)))
+        Box(Modifier.align(Alignment.CenterStart).width(if (alternate) 62.dp else 44.dp).height(2.dp).background(PrimaryText.copy(alpha = .34f)))
+        Text(
+            if (alternate) "B" else "A",
+            color = Background.copy(alpha = .66f),
+            fontSize = 18.sp,
+            fontFamily = FontFamily.Monospace,
+            modifier = Modifier.align(Alignment.BottomEnd),
+        )
     }
 }
 
@@ -1140,11 +1261,12 @@ private fun Artwork(
     design: DisplayDesign,
     motion: ArtworkMotion,
     pressed: Boolean,
+    controlCue: ControlCue?,
     modifier: Modifier,
 ) {
     when (design.tokens.artworkTreatment) {
-        ArtworkTreatment.REFERENCE -> ReferenceArtwork(state, design, motion, pressed, modifier)
-        ArtworkTreatment.STUDIO_DECK -> StudioArtworkDeck(state, design, motion, pressed, modifier)
+        ArtworkTreatment.REFERENCE -> ReferenceArtwork(state, design, motion, pressed, controlCue, modifier)
+        ArtworkTreatment.STUDIO_DECK -> StudioArtworkDeck(state, design, motion, pressed, controlCue, modifier)
     }
 }
 
@@ -1154,6 +1276,7 @@ private fun ReferenceArtwork(
     design: DisplayDesign,
     motion: ArtworkMotion,
     pressed: Boolean,
+    controlCue: ControlCue?,
     modifier: Modifier,
 ) {
     val frameShape = RoundedCornerShape(design.tokens.artworkCornerRadius)
@@ -1171,6 +1294,7 @@ private fun ReferenceArtwork(
     ) {
         ArtworkVisual(state, motion)
         if (pressed) Box(Modifier.fillMaxSize().background(Accent.copy(alpha = .025f)))
+        ControlStateCue(controlCue, Modifier.align(Alignment.BottomCenter).padding(bottom = 16.dp))
     }
 }
 
@@ -1180,6 +1304,7 @@ private fun StudioArtworkDeck(
     design: DisplayDesign,
     motion: ArtworkMotion,
     pressed: Boolean,
+    controlCue: ControlCue?,
     modifier: Modifier,
 ) {
     val shape = RoundedCornerShape(design.tokens.artworkCornerRadius)
@@ -1215,6 +1340,7 @@ private fun StudioArtworkDeck(
         ) {
             ArtworkVisual(state, motion)
             if (pressed) Box(Modifier.fillMaxSize().background(Accent.copy(alpha = .025f)))
+            ControlStateCue(controlCue, Modifier.align(Alignment.BottomCenter).padding(bottom = 12.dp))
         }
         Row(Modifier.fillMaxWidth().height(24.dp), verticalAlignment = Alignment.Bottom) {
             Box(Modifier.size(5.dp).clip(CircleShape).background(if (state.isPlaying) Accent else SecondaryText.copy(alpha = .35f)))
@@ -1230,6 +1356,40 @@ private fun StudioArtworkDeck(
                 modifier = Modifier.weight(1f),
             )
             Text(if (state.isPlaying) "RUN" else "STBY", color = if (state.isPlaying) Accent else SecondaryText, fontSize = 7.sp, fontFamily = FontFamily.Monospace)
+        }
+    }
+}
+
+private data class ControlCue(
+    val showsControls: Boolean,
+    val visible: Boolean,
+)
+
+@Composable
+private fun ControlStateCue(state: ControlCue?, modifier: Modifier = Modifier) {
+    AnimatedVisibility(
+        visible = state?.visible == true,
+        modifier = modifier,
+        enter = fadeIn(tween(120)) + scaleIn(tween(180), initialScale = .94f),
+        exit = fadeOut(tween(240)),
+    ) {
+        Row(
+            Modifier
+                .clip(RoundedCornerShape(3.dp))
+                .background(Background.copy(alpha = .86f))
+                .border(1.dp, Accent.copy(alpha = .34f), RoundedCornerShape(3.dp))
+                .padding(horizontal = 10.dp, vertical = 7.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(Modifier.size(5.dp).clip(CircleShape).background(if (state?.showsControls == true) Accent else SecondaryText))
+            Spacer(Modifier.width(7.dp))
+            Text(
+                if (state?.showsControls == true) "CONTROLS" else "AMBIENT",
+                color = if (state?.showsControls == true) PrimaryText else SecondaryText,
+                fontSize = 8.sp,
+                fontFamily = FontFamily.Monospace,
+                letterSpacing = 1.2.sp,
+            )
         }
     }
 }
@@ -1267,17 +1427,26 @@ private fun ArtworkVisual(state: MediaUiState, motion: ArtworkMotion) {
         ArtworkMotion.FOCUS -> AnimatedContent(
             targetState = frame,
             transitionSpec = {
-                (fadeIn(tween(durationMillis = 360, delayMillis = 40)) +
-                    scaleIn(tween(durationMillis = 520), initialScale = .985f))
-                    .togetherWith(fadeOut(tween(durationMillis = 180)))
+                (fadeIn(tween(durationMillis = 520, delayMillis = 40)) +
+                    scaleIn(tween(durationMillis = 720), initialScale = .94f))
+                    .togetherWith(fadeOut(tween(durationMillis = 280)))
             },
             label = "artwork focus",
         ) { ArtworkFrameContent(it) }
 
         ArtworkMotion.DISSOLVE -> Crossfade(
             targetState = frame,
-            animationSpec = tween(360),
+            animationSpec = tween(620),
             label = "artwork dissolve",
+        ) { ArtworkFrameContent(it) }
+
+        ArtworkMotion.DECK -> AnimatedContent(
+            targetState = frame,
+            transitionSpec = {
+                (fadeIn(tween(420)) + slideInHorizontally(tween(560)) { it / 8 })
+                    .togetherWith(fadeOut(tween(300)) + slideOutHorizontally(tween(480)) { -it / 12 })
+            },
+            label = "artwork deck",
         ) { ArtworkFrameContent(it) }
 
         ArtworkMotion.DIRECT -> ArtworkFrameContent(frame)
@@ -1369,8 +1538,8 @@ private fun PlayerControls(
     val hasAnyControl = state.canSkipPrevious || hasPrimaryControl || state.canSkipNext
     AnimatedVisibility(
         visible = visible && hasAnyControl,
-        enter = fadeIn(tween(180)),
-        exit = fadeOut(tween(260)),
+        enter = fadeIn(tween(220)) + scaleIn(tween(260), initialScale = .9f),
+        exit = fadeOut(tween(220)) + scaleOut(tween(240), targetScale = .96f),
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
@@ -1610,6 +1779,8 @@ private fun PremiumSeekBar(
 }
 
 private const val CONTROLS_TIMEOUT_MS = 6_000L
+private const val CONTROL_CUE_DURATION_MS = 900L
+private const val CONTROL_CUE_EXIT_MS = 260L
 private const val BURN_IN_SHIFT_INTERVAL_MS = 90_000L
 private val BURN_IN_OFFSETS = listOf(0 to 0, 1 to -1, -1 to 1, 1 to 1)
 

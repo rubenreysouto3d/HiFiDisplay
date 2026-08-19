@@ -58,3 +58,9 @@ The source/display panel presents both designs as visual previews, shows palette
 The playback surface now respects Android display-cutout insets while remaining immersive, keeping artwork and metadata clear of landscape camera holes. Interactive surfaces use restrained custom press states and system-respecting haptic confirmation for reveal, transport, selection, and completed seek actions rather than generic Material ripples.
 
 Artwork motion is independent from design and palette and persists across launches. `Focus` introduces the next cover with subtle depth, `Dissolve` uses a scale-free crossfade, and `Direct` disables the transition. Transitions are keyed to meaningful track/source changes, so repeated bitmap instances from a media-session callback no longer restart the animation or create a periodic flash.
+
+## v0.8.1 interaction foundation
+
+Artwork and metadata taps now toggle between the transient control HUD and ambient mode instead of silently restarting the same timeout. A short in-artwork `CONTROLS` / `AMBIENT` confirmation makes the result explicit, while transport and seek interactions keep controls available without changing modes. The shared interaction reducer covers reveal, toggle, keep-alive, timeout, and overlay behavior independently from any skin.
+
+The source entry is now a quieter compact plate with a 48 dp semantic touch target, lower contrast, and less width. Control entrances combine restrained scale and fade. Artwork motion is deliberately more perceptible, adds a directional `Deck` changeover, and includes an A/B preview inside `SOURCE / DISPLAY`; tapping any effect replays its actual timing before it is used on a track change.
