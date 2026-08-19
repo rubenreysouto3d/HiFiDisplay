@@ -42,3 +42,7 @@ Suggested device compatibility pass:
 ## v0.5 sources and appearance
 
 Use the always-visible `SOURCE / DISPLAY` button to choose automatic session following or pin a specific active media app, even when no session is playing. Display design and color palette are independent: `Modern Reference` currently defines structure, typography, and interaction, while `Hi-Fi Green` and `Warm Amber` are interchangeable palettes. Preferences persist across launches and migrate the earlier skin setting automatically. Session diagnostics is also an explicit tool in this panel.
+
+## v0.6 ambient interaction
+
+During active playback, the compact source badge is the single entry point for source, design, palette, and diagnostics. Transport controls share its top rail and fade away after six seconds, while the source remains available. Tap the artwork, metadata, or progress area to reveal controls; using a transport control or seeking restarts the interval. The custom seek surface expands only while controls are visible and is enabled only when the active session advertises seek support. Artwork, bounded metadata, times, and a thin live progress line remain visible without layout jumps. Track and artwork changes crossfade, touch feedback is restrained, missing artwork uses a palette-aware record treatment, and a minute periodic offset helps protect always-on OLED panels. Configuration remains permanently visible on permission, error, and no-session screens.
