@@ -12,16 +12,25 @@ internal enum class ArtworkPlacement {
 internal enum class ArtworkTreatment {
     REFERENCE,
     STUDIO_DECK,
+    MONOLITH_GLASS,
+    PRECISION_FRAME,
+    CRYSTAL_FLOAT,
 }
 
 internal enum class ProgressTreatment {
     CONTINUOUS,
     TICKED,
+    LUMINOUS,
+    SEGMENTED,
+    PRISMATIC,
 }
 
 internal enum class ControlTreatment {
     CIRCULAR,
     CONSOLE,
+    GLASS,
+    MACHINED,
+    FLOATING_GLASS,
 }
 
 internal enum class DisplayLayoutMode {
@@ -67,6 +76,42 @@ internal val DisplayDesign.tokens: DisplayDesignTokens
             contentGap = 52.dp,
             artworkCornerRadius = 2.dp,
             sourceCornerRadius = 2.dp,
+        )
+
+        DisplayDesign.MONOLITH_GLASS -> DisplayDesignTokens(
+            artworkPlacement = ArtworkPlacement.LEADING,
+            artworkTreatment = ArtworkTreatment.MONOLITH_GLASS,
+            progressTreatment = ProgressTreatment.LUMINOUS,
+            controlTreatment = ControlTreatment.GLASS,
+            horizontalPadding = 24.dp,
+            verticalPadding = 20.dp,
+            contentGap = 28.dp,
+            artworkCornerRadius = 18.dp,
+            sourceCornerRadius = 12.dp,
+        )
+
+        DisplayDesign.PRECISION_DECK -> DisplayDesignTokens(
+            artworkPlacement = ArtworkPlacement.TRAILING,
+            artworkTreatment = ArtworkTreatment.PRECISION_FRAME,
+            progressTreatment = ProgressTreatment.SEGMENTED,
+            controlTreatment = ControlTreatment.MACHINED,
+            horizontalPadding = 38.dp,
+            verticalPadding = 24.dp,
+            contentGap = 42.dp,
+            artworkCornerRadius = 4.dp,
+            sourceCornerRadius = 3.dp,
+        )
+
+        DisplayDesign.CRYSTAL_ATRIUM -> DisplayDesignTokens(
+            artworkPlacement = ArtworkPlacement.LEADING,
+            artworkTreatment = ArtworkTreatment.CRYSTAL_FLOAT,
+            progressTreatment = ProgressTreatment.PRISMATIC,
+            controlTreatment = ControlTreatment.FLOATING_GLASS,
+            horizontalPadding = 28.dp,
+            verticalPadding = 22.dp,
+            contentGap = 30.dp,
+            artworkCornerRadius = 22.dp,
+            sourceCornerRadius = 18.dp,
         )
     }
 
