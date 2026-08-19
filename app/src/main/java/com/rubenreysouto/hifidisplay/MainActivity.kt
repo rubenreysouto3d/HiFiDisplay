@@ -37,6 +37,7 @@ class MainActivity : ComponentActivity() {
                 onNext = viewModel::next,
                 onSeek = viewModel::seekTo,
                 onSelectSource = viewModel::selectSource,
+                onSelectDesign = viewModel::selectDesign,
                 onSelectPalette = viewModel::selectPalette,
             )
         }

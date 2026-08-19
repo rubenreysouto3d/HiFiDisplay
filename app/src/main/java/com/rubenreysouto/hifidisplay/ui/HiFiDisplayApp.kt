@@ -39,7 +39,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.*
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -68,6 +68,7 @@ fun HiFiDisplayApp(
     onNext: () -> Unit,
     onSeek: (Long) -> Unit,
     onSelectSource: (String?) -> Unit,
+    onSelectDesign: (DisplayDesign) -> Unit,
     onSelectPalette: (ColorPalette) -> Unit,
 ) {
     val colors = appearance.palette.colors
@@ -109,6 +110,7 @@ fun HiFiDisplayApp(
                     SessionAvailability.ERROR -> SessionError()
                     SessionAvailability.ACTIVE -> NowPlaying(
                         state = state,
+                        design = appearance.design,
                         onPlay = onPlay,
                         onPause = onPause,
                         onPrevious = onPrevious,
@@ -144,6 +146,7 @@ fun HiFiDisplayApp(
                             showSourcePicker = false
                             dispatch(AmbientInteractionEvent.OVERLAY_CLOSED)
                         },
+                        onSelectDesign = onSelectDesign,
                         onSelectPalette = onSelectPalette,
                         onShowDiagnostics = {
                             showSourcePicker = false
@@ -256,6 +259,7 @@ private fun EmptySession() {
 @Composable
 private fun NowPlaying(
     state: MediaUiState,
+    design: DisplayDesign,
     onPlay: () -> Unit,
     onPause: () -> Unit,
     onPrevious: () -> Unit,
@@ -274,24 +278,71 @@ private fun NowPlaying(
         }
     }
     val burnInOffset = BURN_IN_OFFSETS[burnInStep]
+    Crossfade(
+        targetState = design,
+        animationSpec = tween(360),
+        label = "display design",
+    ) { activeDesign ->
+        PlaybackSkinLayout(
+            state = state,
+            design = activeDesign,
+            burnInOffset = burnInOffset,
+            controlsVisible = controlsVisible,
+            onInteraction = onInteraction,
+            onShowSources = onShowSources,
+            onShowDiagnostics = onShowDiagnostics,
+            onPlay = onPlay,
+            onPause = onPause,
+            onPrevious = onPrevious,
+            onNext = onNext,
+            onSeek = onSeek,
+        )
+    }
+}
+
+@Composable
+private fun PlaybackSkinLayout(
+    state: MediaUiState,
+    design: DisplayDesign,
+    burnInOffset: Pair<Int, Int>,
+    controlsVisible: Boolean,
+    onInteraction: () -> Unit,
+    onShowSources: () -> Unit,
+    onShowDiagnostics: () -> Unit,
+    onPlay: () -> Unit,
+    onPause: () -> Unit,
+    onPrevious: () -> Unit,
+    onNext: () -> Unit,
+    onSeek: (Long) -> Unit,
+) {
+    val tokens = design.tokens
     val artworkInteraction = remember { MutableInteractionSource() }
     val metadataInteraction = remember { MutableInteractionSource() }
-    Box(Modifier.fillMaxSize()) {
-        BoxWithConstraints(Modifier.fillMaxSize()) {
-            val compactHeight = maxHeight < 300.dp
-            val horizontalPadding = if (maxWidth < 720.dp) 24.dp else 36.dp
-            val verticalPadding = if (compactHeight) 18.dp else 28.dp
-            val contentGap = if (maxWidth < 720.dp) 28.dp else 40.dp
-            Row(
-                Modifier
-                    .fillMaxSize()
-                    .offset(x = burnInOffset.first.dp, y = burnInOffset.second.dp)
-                    .padding(horizontal = horizontalPadding, vertical = verticalPadding),
-                horizontalArrangement = Arrangement.spacedBy(contentGap),
-            ) {
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+        val layoutMode = resolveDisplayLayoutMode(maxWidth.value, maxHeight.value)
+        val compact = layoutMode == DisplayLayoutMode.COMPACT
+        val horizontalPadding = when (layoutMode) {
+            DisplayLayoutMode.COMPACT -> 24.dp
+            DisplayLayoutMode.STANDARD -> tokens.horizontalPadding
+            DisplayLayoutMode.WIDE -> tokens.horizontalPadding + 8.dp
+        }
+        val verticalPadding = if (compact) 18.dp else tokens.verticalPadding
+        val contentGap = when (layoutMode) {
+            DisplayLayoutMode.COMPACT -> 28.dp
+            DisplayLayoutMode.STANDARD -> tokens.contentGap
+            DisplayLayoutMode.WIDE -> tokens.contentGap + 8.dp
+        }
+        Row(
+            Modifier
+                .fillMaxSize()
+                .offset(x = burnInOffset.first.dp, y = burnInOffset.second.dp)
+                .padding(horizontal = horizontalPadding, vertical = verticalPadding),
+        ) {
+            if (tokens.artworkPlacement == ArtworkPlacement.LEADING) {
                 Artwork(
-                    state,
-                    Modifier
+                    state = state,
+                    design = design,
+                    modifier = Modifier
                         .fillMaxHeight()
                         .aspectRatio(1f)
                         .clickable(
@@ -300,51 +351,129 @@ private fun NowPlaying(
                             onClick = onInteraction,
                         ),
                 )
-                BoxWithConstraints(Modifier.weight(1f).fillMaxHeight()) {
-                    val compactWidth = maxWidth < 400.dp
-                    val compact = compactHeight || compactWidth
-                    Column(Modifier.fillMaxSize()) {
-                        Row(
-                            Modifier.fillMaxWidth().height(if (compact) 54.dp else 64.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            SourceHeader(
-                                state = state,
-                                modifier = Modifier
-                                    .weight(1f, fill = false)
-                                    .widthIn(max = if (compact) 170.dp else 220.dp),
-                                onShowSources = onShowSources,
-                                onShowDiagnostics = onShowDiagnostics,
-                            )
-                            Spacer(Modifier.width(if (compact) 8.dp else 16.dp))
-                            PlayerControls(
-                                state = state,
-                                visible = controlsVisible,
-                                compact = compact,
-                                onInteraction = onInteraction,
-                                onPlay = onPlay,
-                                onPause = onPause,
-                                onPrevious = onPrevious,
-                                onNext = onNext,
-                            )
-                        }
-                        TrackMetadata(
-                            state = state,
-                            compact = compact,
-                            modifier = Modifier
-                                .weight(1f)
-                                .fillMaxWidth()
-                                .clickable(
-                                    interactionSource = metadataInteraction,
-                                    indication = null,
-                                    onClick = onInteraction,
-                                ),
-                        )
-                        Progress(state, controlsVisible, onInteraction, onSeek)
-                    }
-                }
+                Spacer(Modifier.width(contentGap))
+            }
+            PlaybackInformation(
+                state = state,
+                design = design,
+                compact = compact,
+                controlsVisible = controlsVisible,
+                onInteraction = onInteraction,
+                onShowSources = onShowSources,
+                onShowDiagnostics = onShowDiagnostics,
+                onPlay = onPlay,
+                onPause = onPause,
+                onPrevious = onPrevious,
+                onNext = onNext,
+                onSeek = onSeek,
+                metadataModifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .clickable(
+                        interactionSource = metadataInteraction,
+                        indication = null,
+                        onClick = onInteraction,
+                    ),
+                modifier = Modifier.weight(1f).fillMaxHeight(),
+            )
+            if (tokens.artworkPlacement == ArtworkPlacement.TRAILING) {
+                Spacer(Modifier.width(contentGap))
+                Artwork(
+                    state = state,
+                    design = design,
+                    modifier = Modifier
+                        .fillMaxHeight()
+                        .aspectRatio(1f)
+                        .clickable(
+                            interactionSource = artworkInteraction,
+                            indication = null,
+                            onClick = onInteraction,
+                        ),
+                )
             }
         }
+    }
+}
+
+@Composable
+private fun PlaybackInformation(
+    state: MediaUiState,
+    design: DisplayDesign,
+    compact: Boolean,
+    controlsVisible: Boolean,
+    onInteraction: () -> Unit,
+    onShowSources: () -> Unit,
+    onShowDiagnostics: () -> Unit,
+    onPlay: () -> Unit,
+    onPause: () -> Unit,
+    onPrevious: () -> Unit,
+    onNext: () -> Unit,
+    onSeek: (Long) -> Unit,
+    metadataModifier: Modifier,
+    modifier: Modifier = Modifier,
+) {
+    val studio = design == DisplayDesign.STUDIO_LEDGER
+    val studioBottomControls = studio && !compact
+    Column(modifier) {
+        Row(
+            Modifier.fillMaxWidth().height(if (compact) 54.dp else 64.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            SourceHeader(
+                state = state,
+                design = design,
+                modifier = Modifier
+                    .weight(1f, fill = false)
+                    .widthIn(max = if (compact) 170.dp else 220.dp),
+                onShowSources = onShowSources,
+                onShowDiagnostics = onShowDiagnostics,
+            )
+            if (!studioBottomControls) {
+                Spacer(Modifier.width(if (compact) 8.dp else 16.dp))
+                PlayerControls(
+                    state = state,
+                    design = design,
+                    visible = controlsVisible,
+                    compact = compact,
+                    onInteraction = onInteraction,
+                    onPlay = onPlay,
+                    onPause = onPause,
+                    onPrevious = onPrevious,
+                    onNext = onNext,
+                )
+            }
+        }
+        TrackMetadata(
+            state = state,
+            design = design,
+            compact = compact,
+            modifier = metadataModifier,
+        )
+        if (studioBottomControls) {
+            Box(
+                Modifier.fillMaxWidth().height(if (compact) 48.dp else 58.dp),
+                contentAlignment = Alignment.CenterEnd,
+            ) {
+                PlayerControls(
+                    state = state,
+                    design = design,
+                    visible = controlsVisible,
+                    compact = compact,
+                    onInteraction = onInteraction,
+                    onPlay = onPlay,
+                    onPause = onPause,
+                    onPrevious = onPrevious,
+                    onNext = onNext,
+                )
+            }
+        }
+        Progress(
+            state = state,
+            design = design,
+            controlsVisible = controlsVisible,
+            onInteraction = onInteraction,
+            onSeek = onSeek,
+        )
     }
 }
 
@@ -355,7 +484,12 @@ private data class TrackCopy(
 )
 
 @Composable
-private fun TrackMetadata(state: MediaUiState, compact: Boolean, modifier: Modifier = Modifier) {
+private fun TrackMetadata(
+    state: MediaUiState,
+    design: DisplayDesign,
+    compact: Boolean,
+    modifier: Modifier = Modifier,
+) {
     val copy = TrackCopy(
         title = state.title?.takeUnless(String::isBlank) ?: "Título no disponible",
         artist = state.artist?.takeUnless(String::isBlank),
@@ -367,40 +501,103 @@ private fun TrackMetadata(state: MediaUiState, compact: Boolean, modifier: Modif
             animationSpec = tween(420),
             label = "track metadata",
         ) { track ->
-            Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.Center) {
+            when (design) {
+                DisplayDesign.MODERN_REFERENCE -> ModernMetadata(track, compact)
+                DisplayDesign.STUDIO_LEDGER -> StudioMetadata(track, compact)
+            }
+        }
+    }
+}
+
+@Composable
+private fun ModernMetadata(track: TrackCopy, compact: Boolean) {
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.Center) {
+        Text(
+            text = track.title,
+            color = PrimaryText,
+            fontSize = if (compact) 29.sp else 40.sp,
+            lineHeight = if (compact) 33.sp else 44.sp,
+            fontWeight = FontWeight.Medium,
+            maxLines = if (compact) 1 else 2,
+            overflow = TextOverflow.Ellipsis,
+        )
+        track.artist?.let {
+            Spacer(Modifier.height(if (compact) 7.dp else 12.dp))
+            Text(
+                text = it,
+                color = SecondaryText,
+                fontSize = if (compact) 17.sp else 21.sp,
+                lineHeight = if (compact) 20.sp else 25.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        track.album?.let {
+            Spacer(Modifier.height(5.dp))
+            Text(
+                text = it.uppercase(),
+                color = SecondaryText.copy(alpha = .62f),
+                fontSize = if (compact) 9.sp else 11.sp,
+                lineHeight = if (compact) 11.sp else 14.sp,
+                fontFamily = FontFamily.Monospace,
+                letterSpacing = 1.2.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+}
+
+@Composable
+private fun StudioMetadata(track: TrackCopy, compact: Boolean) {
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Box(
+            Modifier
+                .width(2.dp)
+                .height(if (compact) 112.dp else 154.dp)
+                .background(Accent.copy(alpha = .82f)),
+        )
+        Spacer(Modifier.width(if (compact) 14.dp else 20.dp))
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.Center) {
+            Text(
+                text = "PROGRAM / NOW PLAYING",
+                color = Accent.copy(alpha = .82f),
+                fontSize = if (compact) 8.sp else 9.sp,
+                fontFamily = FontFamily.Monospace,
+                letterSpacing = 1.8.sp,
+            )
+            Spacer(Modifier.height(if (compact) 8.dp else 13.dp))
+            Text(
+                text = track.title.uppercase(),
+                color = PrimaryText,
+                fontSize = if (compact) 25.sp else 35.sp,
+                lineHeight = if (compact) 29.sp else 39.sp,
+                fontWeight = FontWeight.Light,
+                letterSpacing = .35.sp,
+                maxLines = if (compact) 1 else 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+            track.artist?.let {
+                Spacer(Modifier.height(if (compact) 7.dp else 11.dp))
                 Text(
-                    text = track.title,
-                    color = PrimaryText,
-                    fontSize = if (compact) 29.sp else 40.sp,
-                    lineHeight = if (compact) 33.sp else 44.sp,
-                    fontWeight = FontWeight.Medium,
-                    maxLines = if (compact) 1 else 2,
+                    text = it,
+                    color = SecondaryText,
+                    fontSize = if (compact) 15.sp else 18.sp,
+                    maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
-                track.artist?.let {
-                    Spacer(Modifier.height(if (compact) 7.dp else 12.dp))
-                    Text(
-                        text = it,
-                        color = SecondaryText,
-                        fontSize = if (compact) 17.sp else 21.sp,
-                        lineHeight = if (compact) 20.sp else 25.sp,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-                track.album?.let {
-                    Spacer(Modifier.height(5.dp))
-                    Text(
-                        text = it.uppercase(),
-                        color = SecondaryText.copy(alpha = .62f),
-                        fontSize = if (compact) 9.sp else 11.sp,
-                        lineHeight = if (compact) 11.sp else 14.sp,
-                        fontFamily = FontFamily.Monospace,
-                        letterSpacing = 1.2.sp,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
+            }
+            track.album?.let {
+                Spacer(Modifier.height(5.dp))
+                Text(
+                    text = "ALBUM / ${it.uppercase()}",
+                    color = SecondaryText.copy(alpha = .58f),
+                    fontSize = if (compact) 8.sp else 9.sp,
+                    fontFamily = FontFamily.Monospace,
+                    letterSpacing = 1.1.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
             }
         }
     }
@@ -410,23 +607,30 @@ private fun TrackMetadata(state: MediaUiState, compact: Boolean, modifier: Modif
 @Composable
 private fun SourceHeader(
     state: MediaUiState,
+    design: DisplayDesign,
     modifier: Modifier = Modifier,
     onShowSources: () -> Unit,
     onShowDiagnostics: () -> Unit,
 ) {
+    val studio = design == DisplayDesign.STUDIO_LEDGER
+    val shape = RoundedCornerShape(design.tokens.sourceCornerRadius)
     val interactionSource = remember { MutableInteractionSource() }
     val pressed by interactionSource.collectIsPressedAsState()
     val container by animateColorAsState(
-        targetValue = if (pressed) SurfaceRaised.copy(alpha = .8f) else SurfaceRaised.copy(alpha = .34f),
+        targetValue = when {
+            pressed -> SurfaceRaised.copy(alpha = .8f)
+            studio -> SurfaceRaised.copy(alpha = .18f)
+            else -> SurfaceRaised.copy(alpha = .34f)
+        },
         animationSpec = tween(120),
         label = "source press",
     )
     Row(
         modifier = modifier
             .height(48.dp)
-            .clip(RoundedCornerShape(5.dp))
+            .clip(shape)
             .background(container)
-            .border(1.dp, SecondaryText.copy(alpha = if (pressed) .26f else .12f), RoundedCornerShape(5.dp))
+            .border(1.dp, SecondaryText.copy(alpha = if (pressed) .3f else .12f), shape)
             .combinedClickable(
                 interactionSource = interactionSource,
                 indication = null,
@@ -440,17 +644,17 @@ private fun SourceHeader(
     ) {
         Box(
             Modifier
-                .size(7.dp)
-                .clip(CircleShape)
+                .then(if (studio) Modifier.width(3.dp).height(14.dp) else Modifier.size(7.dp))
+                .clip(if (studio) RoundedCornerShape(1.dp) else CircleShape)
                 .background(if (state.isPlaying) Accent else SecondaryText.copy(alpha = .4f))
         )
         Spacer(Modifier.width(9.dp))
         Text(
             (state.sourceApp ?: "Sesión multimedia").uppercase(),
             color = if (state.isPlaying) Accent else SecondaryText,
-            fontSize = 11.sp,
+            fontSize = if (studio) 10.sp else 11.sp,
             fontFamily = FontFamily.Monospace,
-            letterSpacing = 1.7.sp,
+            letterSpacing = if (studio) 2.sp else 1.7.sp,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f),
@@ -465,6 +669,7 @@ private fun SourcePickerOverlay(
     state: MediaUiState,
     appearance: DisplayAppearance,
     onSelectSource: (String?) -> Unit,
+    onSelectDesign: (DisplayDesign) -> Unit,
     onSelectPalette: (ColorPalette) -> Unit,
     onShowDiagnostics: () -> Unit,
     onDismiss: () -> Unit,
@@ -472,10 +677,10 @@ private fun SourcePickerOverlay(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Background.copy(alpha = .98f))
-            .padding(horizontal = 48.dp, vertical = 30.dp),
+            .background(Background)
+            .padding(horizontal = 48.dp, vertical = 20.dp),
     ) {
-        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+        Column(Modifier.fillMaxSize()) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     "SOURCE / DISPLAY",
@@ -489,98 +694,221 @@ private fun SourcePickerOverlay(
                     Icon(Icons.Rounded.Close, "Cerrar", tint = SecondaryText)
                 }
             }
-            Spacer(Modifier.height(18.dp))
-            Text("FUENTE", color = SecondaryText, fontSize = 10.sp, fontFamily = FontFamily.Monospace, letterSpacing = 1.5.sp)
-            Spacer(Modifier.height(7.dp))
-            PickerRow(
-                title = "AUTO",
-                subtitle = "Sigue la sesión con mayor actividad",
-                selected = state.pinnedSourcePackage == null,
-                onClick = { onSelectSource(null) },
-            )
-            if (state.availableSources.isEmpty()) {
-                Text(
-                    "NO ACTIVE MEDIA SESSIONS",
-                    color = SecondaryText.copy(alpha = .7f),
-                    fontSize = 10.sp,
-                    fontFamily = FontFamily.Monospace,
-                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
-                )
-            }
-            val pinnedUnavailable = state.pinnedSourcePackage?.takeIf { pinned ->
-                state.availableSources.none { it.packageName == pinned }
-            }
-            pinnedUnavailable?.let { packageName ->
+            Spacer(Modifier.height(10.dp))
+            Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState())) {
+                Text("FUENTE", color = SecondaryText, fontSize = 10.sp, fontFamily = FontFamily.Monospace, letterSpacing = 1.5.sp)
+                Spacer(Modifier.height(7.dp))
                 PickerRow(
-                    title = packageName,
-                    subtitle = "PINNED · NOT ACTIVE · TAP TO CLEAR",
-                    selected = true,
+                    title = "AUTO",
+                    subtitle = "Sigue la sesión con mayor actividad",
+                    selected = state.pinnedSourcePackage == null,
                     onClick = { onSelectSource(null) },
                 )
-            }
-            state.availableSources.forEach { source ->
-                val status = buildList {
-                    if (source.isPlaying) add("PLAYING")
-                    if (source.isSelected) add("ACTIVE")
-                    if (source.isPinned) add("PINNED")
-                }.joinToString(" · ").ifBlank { source.packageName }
-                PickerRow(
-                    title = source.label,
-                    subtitle = status,
-                    selected = source.isPinned,
-                    onClick = { onSelectSource(source.packageName) },
+                if (state.availableSources.isEmpty()) {
+                    Text(
+                        "NO ACTIVE MEDIA SESSIONS",
+                        color = SecondaryText.copy(alpha = .7f),
+                        fontSize = 10.sp,
+                        fontFamily = FontFamily.Monospace,
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+                    )
+                }
+                val pinnedUnavailable = state.pinnedSourcePackage?.takeIf { pinned ->
+                    state.availableSources.none { it.packageName == pinned }
+                }
+                pinnedUnavailable?.let { packageName ->
+                    PickerRow(
+                        title = packageName,
+                        subtitle = "PINNED · NOT ACTIVE · TAP TO CLEAR",
+                        selected = true,
+                        onClick = { onSelectSource(null) },
+                    )
+                }
+                state.availableSources.forEach { source ->
+                    val status = buildList {
+                        if (source.isPlaying) add("PLAYING")
+                        if (source.isSelected) add("ACTIVE")
+                        if (source.isPinned) add("PINNED")
+                    }.joinToString(" · ").ifBlank { source.packageName }
+                    PickerRow(
+                        title = source.label,
+                        subtitle = status,
+                        selected = source.isPinned,
+                        onClick = { onSelectSource(source.packageName) },
+                    )
+                }
+                Spacer(Modifier.height(16.dp))
+                Text("DESIGN", color = SecondaryText, fontSize = 10.sp, fontFamily = FontFamily.Monospace, letterSpacing = 1.5.sp)
+                Spacer(Modifier.height(7.dp))
+                DesignPreviewGrid(
+                    selected = appearance.design,
+                    onSelect = onSelectDesign,
                 )
-            }
-            Spacer(Modifier.height(22.dp))
-            Text("DESIGN", color = SecondaryText, fontSize = 10.sp, fontFamily = FontFamily.Monospace, letterSpacing = 1.5.sp)
-            Spacer(Modifier.height(7.dp))
-            AppearanceInfoRow(
-                title = appearance.design.displayName,
-                subtitle = "STRUCTURE · TYPOGRAPHY · INTERACTION",
-            )
-            Spacer(Modifier.height(22.dp))
-            Text("PALETTE", color = SecondaryText, fontSize = 10.sp, fontFamily = FontFamily.Monospace, letterSpacing = 1.5.sp)
-            Spacer(Modifier.height(7.dp))
-            ColorPalette.entries.forEach { option ->
+                Spacer(Modifier.height(16.dp))
+                Text("PALETTE", color = SecondaryText, fontSize = 10.sp, fontFamily = FontFamily.Monospace, letterSpacing = 1.5.sp)
+                Spacer(Modifier.height(7.dp))
+                ColorPalette.entries.forEach { option ->
+                    PalettePickerRow(
+                        palette = option,
+                        selected = appearance.palette == option,
+                        onClick = { onSelectPalette(option) },
+                    )
+                }
+                Spacer(Modifier.height(16.dp))
+                Text("TOOLS", color = SecondaryText, fontSize = 10.sp, fontFamily = FontFamily.Monospace, letterSpacing = 1.5.sp)
+                Spacer(Modifier.height(7.dp))
                 PickerRow(
-                    title = option.displayName,
-                    subtitle = option.storageKey.uppercase(),
-                    selected = appearance.palette == option,
-                    onClick = { onSelectPalette(option) },
+                    title = "Session diagnostics",
+                    subtitle = if (state.hasActiveSession) "VIEW SESSION CAPABILITIES" else "REQUIRES AN ACTIVE SESSION",
+                    selected = false,
+                    enabled = state.hasActiveSession,
+                    onClick = onShowDiagnostics,
                 )
+                Spacer(Modifier.height(12.dp))
             }
-            Spacer(Modifier.height(22.dp))
-            Text("TOOLS", color = SecondaryText, fontSize = 10.sp, fontFamily = FontFamily.Monospace, letterSpacing = 1.5.sp)
-            Spacer(Modifier.height(7.dp))
-            PickerRow(
-                title = "Session diagnostics",
-                subtitle = if (state.hasActiveSession) "VIEW SESSION CAPABILITIES" else "REQUIRES AN ACTIVE SESSION",
-                selected = false,
-                enabled = state.hasActiveSession,
-                onClick = onShowDiagnostics,
-            )
         }
     }
 }
 
 @Composable
-private fun AppearanceInfoRow(title: String, subtitle: String) {
+private fun DesignPreviewGrid(
+    selected: DisplayDesign,
+    onSelect: (DisplayDesign) -> Unit,
+) {
+    BoxWithConstraints(Modifier.fillMaxWidth()) {
+        if (maxWidth < 600.dp) {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                DisplayDesign.entries.forEach { design ->
+                    DesignPreviewCard(design, selected == design, { onSelect(design) }, Modifier.fillMaxWidth())
+                }
+            }
+        } else {
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                DisplayDesign.entries.forEach { design ->
+                    DesignPreviewCard(design, selected == design, { onSelect(design) }, Modifier.weight(1f))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun DesignPreviewCard(
+    design: DisplayDesign,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val pressed by interactionSource.collectIsPressedAsState()
+    val shape = RoundedCornerShape(4.dp)
+    Column(
+        modifier
+            .height(86.dp)
+            .clip(shape)
+            .background(
+                when {
+                    pressed -> SurfaceRaised.copy(alpha = .72f)
+                    selected -> Accent.copy(alpha = .08f)
+                    else -> SurfaceRaised.copy(alpha = .25f)
+                },
+            )
+            .border(1.dp, if (selected) Accent.copy(alpha = .55f) else SecondaryText.copy(alpha = .12f), shape)
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null,
+                role = Role.Button,
+                onClick = onClick,
+            )
+            .padding(9.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text(design.displayName, color = PrimaryText, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(
+                    design.descriptor,
+                    color = SecondaryText,
+                    fontSize = 7.sp,
+                    fontFamily = FontFamily.Monospace,
+                    letterSpacing = .7.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            Box(
+                Modifier
+                    .size(6.dp)
+                    .clip(CircleShape)
+                    .background(if (selected) Accent else SecondaryText.copy(alpha = .22f)),
+            )
+        }
+        Spacer(Modifier.height(6.dp))
+        DesignMiniature(design)
+    }
+}
+
+@Composable
+private fun DesignMiniature(design: DisplayDesign) {
+    Row(Modifier.fillMaxWidth().height(28.dp), verticalAlignment = Alignment.CenterVertically) {
+        if (design == DisplayDesign.MODERN_REFERENCE) {
+            Box(Modifier.size(28.dp).clip(RoundedCornerShape(3.dp)).background(SecondaryText.copy(alpha = .2f)))
+            Spacer(Modifier.width(9.dp))
+        }
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Box(Modifier.fillMaxWidth(.78f).height(3.dp).background(PrimaryText.copy(alpha = .7f)))
+            Box(Modifier.fillMaxWidth(.52f).height(2.dp).background(SecondaryText.copy(alpha = .45f)))
+            Box(Modifier.fillMaxWidth().height(1.dp).background(Accent.copy(alpha = .7f)))
+        }
+        if (design == DisplayDesign.STUDIO_LEDGER) {
+            Spacer(Modifier.width(9.dp))
+            Column(
+                Modifier
+                    .size(28.dp)
+                    .border(1.dp, SecondaryText.copy(alpha = .24f), RoundedCornerShape(1.dp))
+                    .padding(3.dp),
+            ) {
+                Box(Modifier.fillMaxWidth().height(2.dp).background(Accent.copy(alpha = .7f)))
+                Spacer(Modifier.height(3.dp))
+                Box(Modifier.fillMaxSize().background(SecondaryText.copy(alpha = .18f)))
+            }
+        }
+    }
+}
+
+@Composable
+private fun PalettePickerRow(
+    palette: ColorPalette,
+    selected: Boolean,
+    onClick: () -> Unit,
+) {
+    val colors = palette.colors
     Row(
-        modifier = Modifier
+        Modifier
             .fillMaxWidth()
             .heightIn(min = 48.dp)
             .clip(RoundedCornerShape(4.dp))
-            .background(SurfaceRaised.copy(alpha = .45f))
+            .background(if (selected) Accent.copy(alpha = .1f) else Color.Transparent)
+            .clickable(onClick = onClick)
             .padding(horizontal = 14.dp, vertical = 9.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(Modifier.size(7.dp).clip(CircleShape).background(Accent))
+        Row(horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+            listOf(colors.background, colors.primaryText, colors.accent).forEach { color ->
+                Box(
+                    Modifier
+                        .size(12.dp)
+                        .clip(CircleShape)
+                        .background(color)
+                        .border(1.dp, SecondaryText.copy(alpha = .2f), CircleShape),
+                )
+            }
+        }
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
-            Text(title, color = PrimaryText, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text(subtitle, color = SecondaryText, fontSize = 9.sp, fontFamily = FontFamily.Monospace, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(palette.displayName, color = PrimaryText, fontSize = 14.sp)
+            Text("COLOR ONLY", color = SecondaryText, fontSize = 8.sp, fontFamily = FontFamily.Monospace, letterSpacing = 1.sp)
         }
-        Text("ACTIVE", color = Accent, fontSize = 9.sp, fontFamily = FontFamily.Monospace)
+        if (selected) Text("ACTIVE", color = Accent, fontSize = 9.sp, fontFamily = FontFamily.Monospace)
     }
 }
 
@@ -682,8 +1010,20 @@ private fun DiagnosticLine(label: String, value: String) {
 private fun Boolean.availableLabel() = if (this) "AVAILABLE" else "MISSING"
 
 @Composable
-private fun Artwork(state: MediaUiState, modifier: Modifier) {
-    val frameShape = RoundedCornerShape(10.dp)
+private fun Artwork(
+    state: MediaUiState,
+    design: DisplayDesign,
+    modifier: Modifier,
+) {
+    when (design.tokens.artworkTreatment) {
+        ArtworkTreatment.REFERENCE -> ReferenceArtwork(state, design, modifier)
+        ArtworkTreatment.STUDIO_DECK -> StudioArtworkDeck(state, design, modifier)
+    }
+}
+
+@Composable
+private fun ReferenceArtwork(state: MediaUiState, design: DisplayDesign, modifier: Modifier) {
+    val frameShape = RoundedCornerShape(design.tokens.artworkCornerRadius)
     Box(
         modifier
             .clip(frameShape)
@@ -691,21 +1031,74 @@ private fun Artwork(state: MediaUiState, modifier: Modifier) {
             .border(1.dp, SecondaryText.copy(alpha = .12f), frameShape),
         contentAlignment = Alignment.Center,
     ) {
-        Crossfade(
-            targetState = state.artwork,
-            animationSpec = tween(480),
-            label = "album artwork",
-        ) { artwork ->
-            if (artwork != null) {
-                Image(
-                    bitmap = artwork.asImageBitmap(),
-                    contentDescription = state.title?.let { "Carátula de $it" },
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Crop,
-                )
-            } else {
-                ArtworkFallback(state.sourceApp)
-            }
+        ArtworkVisual(state)
+    }
+}
+
+@Composable
+private fun StudioArtworkDeck(state: MediaUiState, design: DisplayDesign, modifier: Modifier) {
+    val shape = RoundedCornerShape(design.tokens.artworkCornerRadius)
+    Column(
+        modifier
+            .clip(shape)
+            .background(Surface.copy(alpha = .94f))
+            .border(1.dp, SecondaryText.copy(alpha = .2f), shape)
+            .padding(12.dp),
+    ) {
+        Row(Modifier.fillMaxWidth().height(18.dp), verticalAlignment = Alignment.Top) {
+            Text(
+                "MASTER SOURCE",
+                color = SecondaryText.copy(alpha = .72f),
+                fontSize = 7.sp,
+                fontFamily = FontFamily.Monospace,
+                letterSpacing = 1.4.sp,
+                modifier = Modifier.weight(1f),
+            )
+            Text("A / 01", color = Accent, fontSize = 7.sp, fontFamily = FontFamily.Monospace, letterSpacing = 1.sp)
+        }
+        Box(
+            Modifier
+                .weight(1f)
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(1.dp))
+                .background(SurfaceRaised),
+        ) {
+            ArtworkVisual(state)
+        }
+        Row(Modifier.fillMaxWidth().height(24.dp), verticalAlignment = Alignment.Bottom) {
+            Box(Modifier.size(5.dp).clip(CircleShape).background(if (state.isPlaying) Accent else SecondaryText.copy(alpha = .35f)))
+            Spacer(Modifier.width(7.dp))
+            Text(
+                (state.sourceApp ?: "MEDIA SESSION").uppercase(),
+                color = SecondaryText,
+                fontSize = 7.sp,
+                fontFamily = FontFamily.Monospace,
+                letterSpacing = 1.2.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
+            )
+            Text(if (state.isPlaying) "RUN" else "STBY", color = if (state.isPlaying) Accent else SecondaryText, fontSize = 7.sp, fontFamily = FontFamily.Monospace)
+        }
+    }
+}
+
+@Composable
+private fun ArtworkVisual(state: MediaUiState) {
+    Crossfade(
+        targetState = state.artwork,
+        animationSpec = tween(480),
+        label = "album artwork",
+    ) { artwork ->
+        if (artwork != null) {
+            Image(
+                bitmap = artwork.asImageBitmap(),
+                contentDescription = state.title?.let { "Carátula de $it" },
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop,
+            )
+        } else {
+            ArtworkFallback(state.sourceApp)
         }
     }
 }
@@ -767,6 +1160,7 @@ private fun ArtworkFallback(sourceApp: String?) {
 @Composable
 private fun PlayerControls(
     state: MediaUiState,
+    design: DisplayDesign,
     visible: Boolean,
     compact: Boolean,
     onInteraction: () -> Unit,
@@ -786,22 +1180,25 @@ private fun PlayerControls(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(if (compact) 6.dp else 10.dp),
         ) {
-            if (state.canSkipPrevious) ControlButton(Icons.Rounded.SkipPrevious, { onInteraction(); onPrevious() }, "Anterior", compact = compact)
-            if (state.isPlaying && state.canPause) ControlButton(Icons.Rounded.Pause, { onInteraction(); onPause() }, "Pausa", primary = true, compact = compact)
-            else if (!state.isPlaying && state.canPlay) ControlButton(Icons.Rounded.PlayArrow, { onInteraction(); onPlay() }, "Reproducir", primary = true, compact = compact)
-            if (state.canSkipNext) ControlButton(Icons.Rounded.SkipNext, { onInteraction(); onNext() }, "Siguiente", compact = compact)
+            if (state.canSkipPrevious) ControlButton(design, Icons.Rounded.SkipPrevious, { onInteraction(); onPrevious() }, "Anterior", compact = compact)
+            if (state.isPlaying && state.canPause) ControlButton(design, Icons.Rounded.Pause, { onInteraction(); onPause() }, "Pausa", primary = true, compact = compact)
+            else if (!state.isPlaying && state.canPlay) ControlButton(design, Icons.Rounded.PlayArrow, { onInteraction(); onPlay() }, "Reproducir", primary = true, compact = compact)
+            if (state.canSkipNext) ControlButton(design, Icons.Rounded.SkipNext, { onInteraction(); onNext() }, "Siguiente", compact = compact)
         }
     }
 }
 
 @Composable
 private fun ControlButton(
+    design: DisplayDesign,
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     action: () -> Unit,
     label: String,
     primary: Boolean = false,
     compact: Boolean = false,
 ) {
+    val console = design.tokens.controlTreatment == ControlTreatment.CONSOLE
+    val shape = if (console) RoundedCornerShape(4.dp) else CircleShape
     val interactionSource = remember { MutableInteractionSource() }
     val pressed by interactionSource.collectIsPressedAsState()
     val scale by animateFloatAsState(
@@ -811,9 +1208,12 @@ private fun ControlButton(
     )
     val container by animateColorAsState(
         targetValue = when {
+            primary && console && pressed -> Accent.copy(alpha = .22f)
+            primary && console -> Accent.copy(alpha = .11f)
             primary && pressed -> Accent.copy(alpha = .82f)
             primary -> Accent
             pressed -> SurfaceRaised.copy(alpha = .86f)
+            console -> SurfaceRaised.copy(alpha = .18f)
             else -> SurfaceRaised.copy(alpha = .34f)
         },
         animationSpec = tween(100),
@@ -828,12 +1228,12 @@ private fun ControlButton(
         modifier = Modifier
             .size(size)
             .graphicsLayer { scaleX = scale; scaleY = scale }
-            .clip(CircleShape)
+            .clip(shape)
             .background(container)
             .border(
                 width = 1.dp,
-                color = if (primary) Accent.copy(alpha = .55f) else SecondaryText.copy(alpha = .12f),
-                shape = CircleShape,
+                color = if (primary) Accent.copy(alpha = if (console) .5f else .55f) else SecondaryText.copy(alpha = .12f),
+                shape = shape,
             )
             .clickable(
                 interactionSource = interactionSource,
@@ -846,7 +1246,7 @@ private fun ControlButton(
         Icon(
             imageVector = icon,
             contentDescription = label,
-            tint = if (primary) Background else PrimaryText,
+            tint = if (primary && console) Accent else if (primary) Background else PrimaryText,
             modifier = Modifier.size(if (primary) size * .48f else size * .5f),
         )
     }
@@ -855,6 +1255,7 @@ private fun ControlButton(
 @Composable
 private fun Progress(
     state: MediaUiState,
+    design: DisplayDesign,
     controlsVisible: Boolean,
     onInteraction: () -> Unit,
     onSeek: (Long) -> Unit,
@@ -870,6 +1271,7 @@ private fun Progress(
     Column(Modifier.fillMaxWidth().height(64.dp).then(revealModifier)) {
         PremiumSeekBar(
             progress = progress,
+            treatment = design.tokens.progressTreatment,
             interactive = controlsVisible,
             enabled = state.canSeek && duration != null,
             onValueChange = {
@@ -882,10 +1284,27 @@ private fun Progress(
                 dragValue = null
                 onInteraction()
             },
+            onSetProgress = { value ->
+                if (duration != null) onSeek((value.coerceIn(0f, 1f) * duration).roundToLong())
+                onInteraction()
+            },
         )
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text(formatTime(state.positionMs), color = SecondaryText, fontSize = 11.sp, fontFamily = FontFamily.Monospace)
-            Text(duration?.let(::formatTime) ?: "--:--", color = SecondaryText, fontSize = 11.sp, fontFamily = FontFamily.Monospace)
+            val studio = design == DisplayDesign.STUDIO_LEDGER
+            Text(
+                if (studio) "ELAPSED  ${formatTime(state.positionMs)}" else formatTime(state.positionMs),
+                color = SecondaryText,
+                fontSize = if (studio) 9.sp else 11.sp,
+                fontFamily = FontFamily.Monospace,
+                letterSpacing = if (studio) .8.sp else 0.sp,
+            )
+            Text(
+                if (studio) "TOTAL  ${duration?.let(::formatTime) ?: "--:--"}" else duration?.let(::formatTime) ?: "--:--",
+                color = SecondaryText,
+                fontSize = if (studio) 9.sp else 11.sp,
+                fontFamily = FontFamily.Monospace,
+                letterSpacing = if (studio) .8.sp else 0.sp,
+            )
         }
     }
 }
@@ -893,10 +1312,12 @@ private fun Progress(
 @Composable
 private fun PremiumSeekBar(
     progress: Float,
+    treatment: ProgressTreatment,
     interactive: Boolean,
     enabled: Boolean,
     onValueChange: (Float) -> Unit,
     onValueChangeFinished: () -> Unit,
+    onSetProgress: (Float) -> Unit,
 ) {
     val fraction = progress.coerceIn(0f, 1f)
     val activeHeight by animateDpAsState(
@@ -909,6 +1330,17 @@ private fun PremiumSeekBar(
         animationSpec = tween(160),
         label = "seek thumb",
     )
+    val tickColor = SecondaryText
+    val accessibilityModifier = Modifier.semantics {
+        contentDescription = "Posición de reproducción"
+        progressBarRangeInfo = ProgressBarRangeInfo(fraction, 0f..1f)
+        if (interactive && enabled) {
+            setProgress { value ->
+                onSetProgress(value.coerceIn(0f, 1f))
+                true
+            }
+        }
+    }
     val gestureModifier = if (interactive && enabled) {
         Modifier.pointerInput(onValueChange, onValueChangeFinished) {
             awaitEachGesture {
@@ -926,9 +1358,25 @@ private fun PremiumSeekBar(
         Modifier
             .fillMaxWidth()
             .height(48.dp)
+            .then(accessibilityModifier)
             .then(gestureModifier),
         contentAlignment = Alignment.CenterStart,
     ) {
+        if (treatment == ProgressTreatment.TICKED) {
+            Canvas(Modifier.fillMaxWidth().height(18.dp)) {
+                val centerY = size.height / 2f
+                repeat(25) { index ->
+                    val x = size.width * index / 24f
+                    val halfHeight = if (index % 6 == 0) 5.dp.toPx() else 2.dp.toPx()
+                    drawLine(
+                        color = tickColor.copy(alpha = if (index % 6 == 0) .28f else .16f),
+                        start = androidx.compose.ui.geometry.Offset(x, centerY - halfHeight),
+                        end = androidx.compose.ui.geometry.Offset(x, centerY + halfHeight),
+                        strokeWidth = 1.dp.toPx(),
+                    )
+                }
+            }
+        }
         Box(
             Modifier
                 .fillMaxWidth()

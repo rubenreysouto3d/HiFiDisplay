@@ -3,8 +3,21 @@ package com.rubenreysouto.hifidisplay.ui
 import androidx.compose.runtime.Immutable
 import androidx.compose.ui.graphics.Color
 
-enum class DisplayDesign(val storageKey: String, val displayName: String) {
-    MODERN_REFERENCE("modern-reference", "Modern Reference");
+enum class DisplayDesign(
+    val storageKey: String,
+    val displayName: String,
+    val descriptor: String,
+) {
+    MODERN_REFERENCE(
+        storageKey = "modern-reference",
+        displayName = "Modern Reference",
+        descriptor = "SPACE · BALANCE · SILENCE",
+    ),
+    STUDIO_LEDGER(
+        storageKey = "studio-ledger",
+        displayName = "Studio Ledger",
+        descriptor = "SIGNAL · INDEX · PRECISION",
+    );
 
     companion object {
         fun fromStorage(value: String?): DisplayDesign =
