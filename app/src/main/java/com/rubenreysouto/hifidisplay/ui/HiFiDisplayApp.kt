@@ -1,14 +1,22 @@
 package com.rubenreysouto.hifidisplay.ui
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -24,8 +32,11 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -112,28 +123,13 @@ fun HiFiDisplayApp(
                         },
                     )
                 }
-                AnimatedVisibility(
-                    visible = !activeDisplay || interaction.controlsVisible,
-                    enter = fadeIn(tween(180)),
-                    exit = fadeOut(tween(260)),
-                    modifier = Modifier.align(Alignment.TopEnd),
-                ) {
+                if (!activeDisplay) {
                     DisplayMenuButton(
-                        modifier = Modifier.padding(top = 18.dp, end = 22.dp),
+                        modifier = Modifier.align(Alignment.TopEnd).padding(top = 18.dp, end = 22.dp),
                         onClick = {
                             showSourcePicker = true
                             dispatch(AmbientInteractionEvent.OVERLAY_OPENED)
                         },
-                    )
-                }
-                if (activeDisplay && !interaction.controlsVisible) {
-                    Box(
-                        Modifier
-                            .fillMaxSize()
-                            .clickable(
-                                interactionSource = remember { MutableInteractionSource() },
-                                indication = null,
-                            ) { dispatch(AmbientInteractionEvent.INTERACT) },
                     )
                 }
                 if (showSourcePicker) {
@@ -267,61 +263,161 @@ private fun NowPlaying(
     onShowSources: () -> Unit,
     onShowDiagnostics: () -> Unit,
 ) {
-    Box(Modifier.fillMaxSize()) {
-        Row(Modifier.fillMaxSize().padding(horizontal = 36.dp, vertical = 28.dp), horizontalArrangement = Arrangement.spacedBy(40.dp)) {
-            Artwork(state, Modifier.fillMaxHeight().aspectRatio(1f))
-            Column(Modifier.weight(1f).fillMaxHeight()) {
-                SourceHeader(
-                    state = state,
-                    controlsVisible = controlsVisible,
-                    onShowSources = onShowSources,
-                    onShowDiagnostics = onShowDiagnostics,
-                )
-                Spacer(Modifier.weight(0.7f))
-                Text(state.title ?: "Título no disponible", color = PrimaryText, fontSize = 38.sp, fontWeight = FontWeight.Medium, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                Spacer(Modifier.height(12.dp))
-                state.artist?.let { Text(it, color = SecondaryText, fontSize = 22.sp, maxLines = 1, overflow = TextOverflow.Ellipsis) }
-                state.album?.takeUnless(String::isBlank)?.let {
-                    Text(it.uppercase(), color = SecondaryText.copy(alpha = .65f), fontSize = 12.sp, fontFamily = FontFamily.Monospace, letterSpacing = 1.2.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+    var burnInStep by remember { mutableIntStateOf(0) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(BURN_IN_SHIFT_INTERVAL_MS)
+            burnInStep = (burnInStep + 1) % BURN_IN_OFFSETS.size
+        }
+    }
+    val burnInOffset = BURN_IN_OFFSETS[burnInStep]
+    Box(
+        Modifier
+            .fillMaxSize()
+            .pointerInput(onInteraction) {
+                detectTapGestures(onTap = { onInteraction() })
+            },
+    ) {
+        BoxWithConstraints(Modifier.fillMaxSize()) {
+            val compactHeight = maxHeight < 300.dp
+            val horizontalPadding = if (maxWidth < 720.dp) 24.dp else 36.dp
+            val verticalPadding = if (compactHeight) 18.dp else 28.dp
+            val contentGap = if (maxWidth < 720.dp) 28.dp else 40.dp
+            Row(
+                Modifier
+                    .fillMaxSize()
+                    .offset(x = burnInOffset.first.dp, y = burnInOffset.second.dp)
+                    .padding(horizontal = horizontalPadding, vertical = verticalPadding),
+                horizontalArrangement = Arrangement.spacedBy(contentGap),
+            ) {
+                Artwork(state, Modifier.fillMaxHeight().aspectRatio(1f))
+                BoxWithConstraints(Modifier.weight(1f).fillMaxHeight()) {
+                    val compactWidth = maxWidth < 400.dp
+                    val compact = compactHeight || compactWidth
+                    Column(Modifier.fillMaxSize()) {
+                        Row(
+                            Modifier.fillMaxWidth().height(if (compact) 54.dp else 64.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            SourceHeader(
+                                state = state,
+                                modifier = Modifier.weight(1f).widthIn(max = 240.dp),
+                                onShowSources = onShowSources,
+                                onShowDiagnostics = onShowDiagnostics,
+                            )
+                            Spacer(Modifier.width(if (compact) 8.dp else 16.dp))
+                            PlayerControls(
+                                state = state,
+                                visible = controlsVisible,
+                                compact = compact,
+                                onInteraction = onInteraction,
+                                onPlay = onPlay,
+                                onPause = onPause,
+                                onPrevious = onPrevious,
+                                onNext = onNext,
+                            )
+                        }
+                        TrackMetadata(
+                            state = state,
+                            compact = compact,
+                            modifier = Modifier.weight(1f).fillMaxWidth(),
+                        )
+                        Progress(state, controlsVisible, onInteraction, onSeek)
+                    }
                 }
-                Spacer(Modifier.weight(1f))
-                PlayerControls(
-                    state = state,
-                    visible = controlsVisible,
-                    onInteraction = onInteraction,
-                    onPlay = onPlay,
-                    onPause = onPause,
-                    onPrevious = onPrevious,
-                    onNext = onNext,
-                )
-                Spacer(Modifier.height(20.dp))
-                Progress(state, controlsVisible, onInteraction, onSeek)
             }
         }
     }
 }
 
+private data class TrackCopy(
+    val title: String,
+    val artist: String?,
+    val album: String?,
+)
+
+@Composable
+private fun TrackMetadata(state: MediaUiState, compact: Boolean, modifier: Modifier = Modifier) {
+    val copy = TrackCopy(
+        title = state.title?.takeUnless(String::isBlank) ?: "Título no disponible",
+        artist = state.artist?.takeUnless(String::isBlank),
+        album = state.album?.takeUnless(String::isBlank),
+    )
+    Box(modifier, contentAlignment = Alignment.CenterStart) {
+        Crossfade(
+            targetState = copy,
+            animationSpec = tween(420),
+            label = "track metadata",
+        ) { track ->
+            Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.Center) {
+                Text(
+                    text = track.title,
+                    color = PrimaryText,
+                    fontSize = if (compact) 29.sp else 40.sp,
+                    lineHeight = if (compact) 33.sp else 44.sp,
+                    fontWeight = FontWeight.Medium,
+                    maxLines = if (compact) 1 else 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                track.artist?.let {
+                    Spacer(Modifier.height(if (compact) 7.dp else 12.dp))
+                    Text(
+                        text = it,
+                        color = SecondaryText,
+                        fontSize = if (compact) 17.sp else 21.sp,
+                        lineHeight = if (compact) 20.sp else 25.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                track.album?.let {
+                    Spacer(Modifier.height(5.dp))
+                    Text(
+                        text = it.uppercase(),
+                        color = SecondaryText.copy(alpha = .62f),
+                        fontSize = if (compact) 9.sp else 11.sp,
+                        lineHeight = if (compact) 11.sp else 14.sp,
+                        fontFamily = FontFamily.Monospace,
+                        letterSpacing = 1.2.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun SourceHeader(
     state: MediaUiState,
-    controlsVisible: Boolean,
+    modifier: Modifier = Modifier,
     onShowSources: () -> Unit,
     onShowDiagnostics: () -> Unit,
 ) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val pressed by interactionSource.collectIsPressedAsState()
+    val container by animateColorAsState(
+        targetValue = if (pressed) SurfaceRaised.copy(alpha = .8f) else SurfaceRaised.copy(alpha = .34f),
+        animationSpec = tween(120),
+        label = "source press",
+    )
     Row(
-        modifier = Modifier
-            .heightIn(min = 48.dp)
-            .widthIn(max = 260.dp)
-            .then(
-                if (controlsVisible) {
-                    Modifier.pointerInput(Unit) {
-                        detectTapGestures(
-                            onTap = { onShowSources() },
-                            onLongPress = { onShowDiagnostics() },
-                        )
-                    }
-                } else Modifier,
-            ),
+        modifier = modifier
+            .height(48.dp)
+            .clip(RoundedCornerShape(5.dp))
+            .background(container)
+            .border(1.dp, SecondaryText.copy(alpha = if (pressed) .26f else .12f), RoundedCornerShape(5.dp))
+            .combinedClickable(
+                interactionSource = interactionSource,
+                indication = null,
+                role = Role.Button,
+                onClick = onShowSources,
+                onLongClick = onShowDiagnostics,
+                onLongClickLabel = "Abrir diagnóstico",
+            )
+            .padding(horizontal = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(
@@ -341,12 +437,8 @@ private fun SourceHeader(
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f),
         )
-        AnimatedVisibility(visible = controlsVisible, enter = fadeIn(), exit = fadeOut()) {
-            Row {
-                Spacer(Modifier.width(5.dp))
-                Icon(Icons.Rounded.ExpandMore, "Cambiar fuente", tint = SecondaryText, modifier = Modifier.size(16.dp))
-            }
-        }
+        Spacer(Modifier.width(5.dp))
+        Icon(Icons.Rounded.ExpandMore, "Abrir opciones de fuente y display", tint = SecondaryText, modifier = Modifier.size(16.dp))
     }
 }
 
@@ -573,25 +665,82 @@ private fun Boolean.availableLabel() = if (this) "AVAILABLE" else "MISSING"
 
 @Composable
 private fun Artwork(state: MediaUiState, modifier: Modifier) {
+    val frameShape = RoundedCornerShape(10.dp)
     Box(
         modifier
-            .clip(RoundedCornerShape(8.dp))
-            .background(Brush.linearGradient(listOf(SurfaceRaised, Surface))),
+            .clip(frameShape)
+            .background(Brush.linearGradient(listOf(SurfaceRaised, Surface)))
+            .border(1.dp, SecondaryText.copy(alpha = .12f), frameShape),
         contentAlignment = Alignment.Center,
     ) {
-        val artwork = state.artwork
-        if (artwork != null) {
-            Image(
-                bitmap = artwork.asImageBitmap(),
-                contentDescription = state.title?.let { "Carátula de $it" },
-                modifier = Modifier.fillMaxSize(),
-                contentScale = ContentScale.Crop,
+        Crossfade(
+            targetState = state.artwork,
+            animationSpec = tween(480),
+            label = "album artwork",
+        ) { artwork ->
+            if (artwork != null) {
+                Image(
+                    bitmap = artwork.asImageBitmap(),
+                    contentDescription = state.title?.let { "Carátula de $it" },
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop,
+                )
+            } else {
+                ArtworkFallback(state.sourceApp)
+            }
+        }
+    }
+}
+
+@Composable
+private fun ArtworkFallback(sourceApp: String?) {
+    val disc = PrimaryText.copy(alpha = .11f)
+    val groove = SecondaryText.copy(alpha = .14f)
+    val label = Accent.copy(alpha = .32f)
+    val hole = Background
+    Box(
+        Modifier
+            .fillMaxSize()
+            .background(
+                Brush.radialGradient(
+                    colors = listOf(SurfaceRaised.copy(alpha = .9f), Surface),
+                ),
+            ),
+        contentAlignment = Alignment.Center,
+    ) {
+        Canvas(Modifier.fillMaxSize().padding(28.dp)) {
+            val radius = size.minDimension * .36f
+            drawCircle(color = disc, radius = radius)
+            listOf(.24f, .42f, .60f, .78f, .94f).forEach { fraction ->
+                drawCircle(
+                    color = groove,
+                    radius = radius * fraction,
+                    style = Stroke(width = 1f),
+                )
+            }
+            drawCircle(color = label, radius = radius * .22f)
+            drawCircle(color = hole, radius = radius * .045f)
+        }
+        Column(
+            Modifier.align(Alignment.BottomStart).padding(18.dp),
+        ) {
+            Text(
+                text = "NO COVER",
+                color = PrimaryText.copy(alpha = .72f),
+                fontSize = 10.sp,
+                fontFamily = FontFamily.Monospace,
+                letterSpacing = 1.8.sp,
             )
-        } else {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Icon(Icons.Rounded.Album, null, tint = SecondaryText.copy(alpha = .35f), modifier = Modifier.size(92.dp))
-                Spacer(Modifier.height(12.dp))
-                Text("SIN CARÁTULA", color = SecondaryText.copy(alpha = .65f), fontSize = 11.sp, fontFamily = FontFamily.Monospace, letterSpacing = 1.4.sp)
+            sourceApp?.takeUnless(String::isBlank)?.let {
+                Text(
+                    text = it.uppercase(),
+                    color = SecondaryText.copy(alpha = .6f),
+                    fontSize = 8.sp,
+                    fontFamily = FontFamily.Monospace,
+                    letterSpacing = 1.1.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
             }
         }
     }
@@ -601,6 +750,7 @@ private fun Artwork(state: MediaUiState, modifier: Modifier) {
 private fun PlayerControls(
     state: MediaUiState,
     visible: Boolean,
+    compact: Boolean,
     onInteraction: () -> Unit,
     onPlay: () -> Unit,
     onPause: () -> Unit,
@@ -609,41 +759,78 @@ private fun PlayerControls(
 ) {
     val hasPrimaryControl = if (state.isPlaying) state.canPause else state.canPlay
     val hasAnyControl = state.canSkipPrevious || hasPrimaryControl || state.canSkipNext
-    Box(
-        modifier = Modifier.fillMaxWidth().height(68.dp),
-        contentAlignment = Alignment.Center,
+    AnimatedVisibility(
+        visible = visible && hasAnyControl,
+        enter = fadeIn(tween(180)),
+        exit = fadeOut(tween(260)),
     ) {
-        AnimatedVisibility(
-            visible = visible,
-            enter = fadeIn(tween(180)),
-            exit = fadeOut(tween(260)),
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(if (compact) 6.dp else 10.dp),
         ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(24.dp, Alignment.CenterHorizontally),
-            ) {
-                if (!hasAnyControl) {
-                    Text("CONTROLES NO DISPONIBLES", color = SecondaryText, fontSize = 10.sp, fontFamily = FontFamily.Monospace, letterSpacing = 1.2.sp)
-                } else {
-                    if (state.canSkipPrevious) ControlButton(Icons.Rounded.SkipPrevious, { onInteraction(); onPrevious() }, "Anterior")
-                    if (state.isPlaying && state.canPause) ControlButton(Icons.Rounded.Pause, { onInteraction(); onPause() }, "Pausa", true)
-                    else if (!state.isPlaying && state.canPlay) ControlButton(Icons.Rounded.PlayArrow, { onInteraction(); onPlay() }, "Reproducir", true)
-                    if (state.canSkipNext) ControlButton(Icons.Rounded.SkipNext, { onInteraction(); onNext() }, "Siguiente")
-                }
-            }
+            if (state.canSkipPrevious) ControlButton(Icons.Rounded.SkipPrevious, { onInteraction(); onPrevious() }, "Anterior", compact = compact)
+            if (state.isPlaying && state.canPause) ControlButton(Icons.Rounded.Pause, { onInteraction(); onPause() }, "Pausa", primary = true, compact = compact)
+            else if (!state.isPlaying && state.canPlay) ControlButton(Icons.Rounded.PlayArrow, { onInteraction(); onPlay() }, "Reproducir", primary = true, compact = compact)
+            if (state.canSkipNext) ControlButton(Icons.Rounded.SkipNext, { onInteraction(); onNext() }, "Siguiente", compact = compact)
         }
     }
 }
 
 @Composable
-private fun ControlButton(icon: androidx.compose.ui.graphics.vector.ImageVector, action: () -> Unit, label: String, primary: Boolean = false) {
-    IconButton(
-        onClick = action,
+private fun ControlButton(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    action: () -> Unit,
+    label: String,
+    primary: Boolean = false,
+    compact: Boolean = false,
+) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val pressed by interactionSource.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (pressed) .93f else 1f,
+        animationSpec = tween(100),
+        label = "$label press",
+    )
+    val container by animateColorAsState(
+        targetValue = when {
+            primary && pressed -> Accent.copy(alpha = .82f)
+            primary -> Accent
+            pressed -> SurfaceRaised.copy(alpha = .86f)
+            else -> SurfaceRaised.copy(alpha = .34f)
+        },
+        animationSpec = tween(100),
+        label = "$label color",
+    )
+    val size = when {
+        primary && compact -> 52.dp
+        primary -> 56.dp
+        else -> 48.dp
+    }
+    Box(
         modifier = Modifier
-            .size(if (primary) 68.dp else 52.dp)
-            .then(if (primary) Modifier.background(Accent, CircleShape) else Modifier),
+            .size(size)
+            .graphicsLayer { scaleX = scale; scaleY = scale }
+            .clip(CircleShape)
+            .background(container)
+            .border(
+                width = 1.dp,
+                color = if (primary) Accent.copy(alpha = .55f) else SecondaryText.copy(alpha = .12f),
+                shape = CircleShape,
+            )
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null,
+                role = Role.Button,
+                onClick = action,
+            ),
+        contentAlignment = Alignment.Center,
     ) {
-        Icon(icon, label, tint = if (primary) Background else PrimaryText, modifier = Modifier.fillMaxSize(if (primary) .58f else .72f))
+        Icon(
+            imageVector = icon,
+            contentDescription = label,
+            tint = if (primary) Background else PrimaryText,
+            modifier = Modifier.size(if (primary) size * .48f else size * .5f),
+        )
     }
 }
 
@@ -659,36 +846,29 @@ private fun Progress(
     val progress = dragValue ?: if (duration != null && duration > 0) state.positionMs.toFloat() / duration else 0f
     Column(Modifier.fillMaxWidth().height(64.dp)) {
         Box(Modifier.fillMaxWidth().height(48.dp), contentAlignment = Alignment.Center) {
-            if (controlsVisible) {
-                Slider(
-                    value = progress.coerceIn(0f, 1f),
-                    onValueChange = if (state.canSeek && duration != null) ({ onInteraction(); dragValue = it }) else ({ }),
-                    onValueChangeFinished = {
-                        val value = dragValue
-                        if (value != null && duration != null) onSeek((value * duration).roundToLong())
-                        dragValue = null
-                        onInteraction()
-                    },
-                    enabled = state.canSeek && duration != null,
-                    colors = SliderDefaults.colors(
-                        thumbColor = Accent, activeTrackColor = Accent, inactiveTrackColor = SecondaryText.copy(alpha = .25f),
-                        disabledThumbColor = SecondaryText, disabledActiveTrackColor = SecondaryText.copy(alpha = .45f),
-                    ),
-                )
-            } else {
-                Box(
-                    Modifier
-                        .fillMaxWidth()
-                        .height(2.dp)
-                        .clip(CircleShape)
-                        .background(SecondaryText.copy(alpha = .18f)),
-                ) {
-                    Box(
-                        Modifier
-                            .fillMaxWidth(progress.coerceIn(0f, 1f))
-                            .fillMaxHeight()
-                            .background(Accent.copy(alpha = .82f)),
+            Crossfade(
+                targetState = controlsVisible,
+                animationSpec = tween(200),
+                label = "progress interaction",
+            ) { interactive ->
+                if (interactive) {
+                    Slider(
+                        value = progress.coerceIn(0f, 1f),
+                        onValueChange = if (state.canSeek && duration != null) ({ onInteraction(); dragValue = it }) else ({ }),
+                        onValueChangeFinished = {
+                            val value = dragValue
+                            if (value != null && duration != null) onSeek((value * duration).roundToLong())
+                            dragValue = null
+                            onInteraction()
+                        },
+                        enabled = state.canSeek && duration != null,
+                        colors = SliderDefaults.colors(
+                            thumbColor = Accent, activeTrackColor = Accent, inactiveTrackColor = SecondaryText.copy(alpha = .25f),
+                            disabledThumbColor = SecondaryText, disabledActiveTrackColor = SecondaryText.copy(alpha = .45f),
+                        ),
                     )
+                } else {
+                    AmbientProgressTrack(progress = progress)
                 }
             }
         }
@@ -699,7 +879,27 @@ private fun Progress(
     }
 }
 
+@Composable
+private fun AmbientProgressTrack(progress: Float) {
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .height(2.dp)
+            .clip(CircleShape)
+            .background(SecondaryText.copy(alpha = .18f)),
+    ) {
+        Box(
+            Modifier
+                .fillMaxWidth(progress.coerceIn(0f, 1f))
+                .fillMaxHeight()
+                .background(Accent.copy(alpha = .82f)),
+        )
+    }
+}
+
 private const val CONTROLS_TIMEOUT_MS = 6_000L
+private const val BURN_IN_SHIFT_INTERVAL_MS = 90_000L
+private val BURN_IN_OFFSETS = listOf(0 to 0, 1 to -1, -1 to 1, 1 to 1)
 
 private fun formatTime(milliseconds: Long): String {
     val seconds = milliseconds.coerceAtLeast(0L) / 1_000L
