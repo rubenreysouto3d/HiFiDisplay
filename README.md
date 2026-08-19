@@ -11,6 +11,7 @@ HiFiDisplay is a landscape Android display and controller for the active system 
 ## Build and test
 
 ```bash
+./gradlew :app:lintDebug
 ./gradlew :app:testDebugUnitTest
 ./gradlew :app:assembleDebug
 ```
@@ -24,3 +25,16 @@ The media layer keeps session arbitration, playback capabilities, position estim
 ## v0.3 session safety
 
 Transport commands are validated against the latest session actions inside the repository, not only in the UI. Controller reads and callback registration tolerate sessions that disappear mid-operation, while playback speed and seek positions are sanitized before updating the display or sending commands.
+
+## v0.4 compatibility diagnostics
+
+Long-press the source application name while a session is active to open a privacy-safe diagnostics overlay. It reports the package, playback state, advertised controls, metadata availability, and retry state without displaying or storing notification contents.
+
+Suggested device compatibility pass:
+
+| App | Session detected | App switching | Controls | Seek | Metadata/artwork |
+| --- | --- | --- | --- | --- | --- |
+| Spotify | ☐ | ☐ | ☐ | ☐ | ☐ |
+| YouTube Music | ☐ | ☐ | ☐ | ☐ | ☐ |
+| Poweramp | ☐ | ☐ | ☐ | ☐ | ☐ |
+| Other player | ☐ | ☐ | ☐ | ☐ | ☐ |

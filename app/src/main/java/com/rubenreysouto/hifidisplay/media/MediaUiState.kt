@@ -35,6 +35,19 @@ data class MediaSourceUiState(
     val isPinned: Boolean,
 )
 
+data class MediaDiagnosticsUiState(
+    val packageName: String? = null,
+    val playbackStatus: MediaPlaybackStatus = MediaPlaybackStatus.IDLE,
+    val supportedActions: List<String> = emptyList(),
+    val hasTitle: Boolean = false,
+    val hasArtist: Boolean = false,
+    val hasAlbum: Boolean = false,
+    val hasArtwork: Boolean = false,
+    val hasDuration: Boolean = false,
+    val retryAttempt: Int = 0,
+    val errorType: String? = null,
+)
+
 data class MediaUiState(
     val availability: SessionAvailability = SessionAvailability.PERMISSION_REQUIRED,
     val playbackStatus: MediaPlaybackStatus = MediaPlaybackStatus.IDLE,
@@ -50,6 +63,7 @@ data class MediaUiState(
     val positionMs: Long = 0L,
     val durationMs: Long? = null,
     val errorMessage: String? = null,
+    val diagnostics: MediaDiagnosticsUiState = MediaDiagnosticsUiState(),
 ) {
     val hasNotificationAccess: Boolean
         get() = availability != SessionAvailability.PERMISSION_REQUIRED

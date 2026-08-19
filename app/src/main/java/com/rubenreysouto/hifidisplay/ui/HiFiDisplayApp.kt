@@ -2,6 +2,8 @@ package com.rubenreysouto.hifidisplay.ui
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -16,6 +18,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -123,28 +126,37 @@ private fun NowPlaying(
     onNext: () -> Unit,
     onSeek: (Long) -> Unit,
 ) {
-    Row(Modifier.fillMaxSize().padding(horizontal = 36.dp, vertical = 28.dp), horizontalArrangement = Arrangement.spacedBy(40.dp)) {
-        Artwork(state, Modifier.fillMaxHeight().aspectRatio(1f))
-        Column(Modifier.weight(1f).fillMaxHeight()) {
-            SourceHeader(state)
-            Spacer(Modifier.weight(0.7f))
-            Text(state.title ?: "Título no disponible", color = PrimaryText, fontSize = 38.sp, fontWeight = FontWeight.Medium, maxLines = 2, overflow = TextOverflow.Ellipsis)
-            Spacer(Modifier.height(12.dp))
-            state.artist?.let { Text(it, color = SecondaryText, fontSize = 22.sp, maxLines = 1, overflow = TextOverflow.Ellipsis) }
-            state.album?.takeUnless(String::isBlank)?.let {
-                Text(it.uppercase(), color = SecondaryText.copy(alpha = .65f), fontSize = 12.sp, fontFamily = FontFamily.Monospace, letterSpacing = 1.2.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+    var showDiagnostics by remember { mutableStateOf(false) }
+    Box(Modifier.fillMaxSize()) {
+        Row(Modifier.fillMaxSize().padding(horizontal = 36.dp, vertical = 28.dp), horizontalArrangement = Arrangement.spacedBy(40.dp)) {
+            Artwork(state, Modifier.fillMaxHeight().aspectRatio(1f))
+            Column(Modifier.weight(1f).fillMaxHeight()) {
+                SourceHeader(state, onShowDiagnostics = { showDiagnostics = true })
+                Spacer(Modifier.weight(0.7f))
+                Text(state.title ?: "Título no disponible", color = PrimaryText, fontSize = 38.sp, fontWeight = FontWeight.Medium, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                Spacer(Modifier.height(12.dp))
+                state.artist?.let { Text(it, color = SecondaryText, fontSize = 22.sp, maxLines = 1, overflow = TextOverflow.Ellipsis) }
+                state.album?.takeUnless(String::isBlank)?.let {
+                    Text(it.uppercase(), color = SecondaryText.copy(alpha = .65f), fontSize = 12.sp, fontFamily = FontFamily.Monospace, letterSpacing = 1.2.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+                Spacer(Modifier.weight(1f))
+                PlayerControls(state, onPlay, onPause, onPrevious, onNext)
+                Spacer(Modifier.height(20.dp))
+                Progress(state, onSeek)
             }
-            Spacer(Modifier.weight(1f))
-            PlayerControls(state, onPlay, onPause, onPrevious, onNext)
-            Spacer(Modifier.height(20.dp))
-            Progress(state, onSeek)
         }
+        if (showDiagnostics) DiagnosticsOverlay(state, onDismiss = { showDiagnostics = false })
     }
 }
 
 @Composable
-private fun SourceHeader(state: MediaUiState) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
+private fun SourceHeader(state: MediaUiState, onShowDiagnostics: () -> Unit) {
+    Row(
+        modifier = Modifier.pointerInput(Unit) {
+            detectTapGestures(onLongPress = { onShowDiagnostics() })
+        },
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
         Box(
             Modifier
                 .size(7.dp)
@@ -161,6 +173,67 @@ private fun SourceHeader(state: MediaUiState) {
         )
     }
 }
+
+@Composable
+private fun DiagnosticsOverlay(state: MediaUiState, onDismiss: () -> Unit) {
+    val diagnostics = state.diagnostics
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Background.copy(alpha = .97f))
+            .clickable(onClick = onDismiss)
+            .padding(horizontal = 52.dp, vertical = 36.dp),
+    ) {
+        Column(Modifier.fillMaxSize()) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text(
+                    "SESSION DIAGNOSTICS",
+                    color = Accent,
+                    fontSize = 13.sp,
+                    fontFamily = FontFamily.Monospace,
+                    letterSpacing = 2.sp,
+                )
+                Text("TOCA PARA CERRAR", color = SecondaryText, fontSize = 10.sp, fontFamily = FontFamily.Monospace)
+            }
+            Spacer(Modifier.height(28.dp))
+            DiagnosticLine("PACKAGE", diagnostics.packageName ?: "—")
+            DiagnosticLine("STATE", diagnostics.playbackStatus.name)
+            DiagnosticLine("ACTIONS", diagnostics.supportedActions.joinToString().ifBlank { "NONE" })
+            DiagnosticLine("TITLE", diagnostics.hasTitle.availableLabel())
+            DiagnosticLine("ARTIST", diagnostics.hasArtist.availableLabel())
+            DiagnosticLine("ALBUM", diagnostics.hasAlbum.availableLabel())
+            DiagnosticLine("ARTWORK", diagnostics.hasArtwork.availableLabel())
+            DiagnosticLine("DURATION", diagnostics.hasDuration.availableLabel())
+            DiagnosticLine("RETRY", diagnostics.retryAttempt.toString())
+            diagnostics.errorType?.let { DiagnosticLine("ERROR", it) }
+            Spacer(Modifier.weight(1f))
+            Text(
+                "No se muestra ni almacena contenido de notificaciones.",
+                color = SecondaryText.copy(alpha = .7f),
+                fontSize = 11.sp,
+                fontFamily = FontFamily.Monospace,
+            )
+        }
+    }
+}
+
+@Composable
+private fun DiagnosticLine(label: String, value: String) {
+    Row(Modifier.fillMaxWidth().padding(vertical = 5.dp)) {
+        Text(label, color = SecondaryText, fontSize = 11.sp, fontFamily = FontFamily.Monospace, modifier = Modifier.width(110.dp))
+        Text(
+            value,
+            color = PrimaryText,
+            fontSize = 12.sp,
+            fontFamily = FontFamily.Monospace,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f),
+        )
+    }
+}
+
+private fun Boolean.availableLabel() = if (this) "AVAILABLE" else "MISSING"
 
 @Composable
 private fun Artwork(state: MediaUiState, modifier: Modifier) {
