@@ -63,6 +63,7 @@ import androidx.compose.ui.unit.sp
 import com.rubenreysouto.hifidisplay.media.MediaUiState
 import com.rubenreysouto.hifidisplay.media.SessionAvailability
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlin.math.roundToLong
 
 private val Background: Color @Composable get() = MaterialTheme.colorScheme.background
@@ -366,7 +367,7 @@ private fun PlaybackSkinLayout(
     val artworkPressed by artworkInteraction.collectIsPressedAsState()
     val metadataPressed by metadataInteraction.collectIsPressedAsState()
     val artworkScale by animateFloatAsState(
-        targetValue = if (artworkPressed) .988f else 1f,
+        targetValue = if (artworkPressed) .975f else 1f,
         animationSpec = tween(110),
         label = "artwork touch",
     )
@@ -489,11 +490,16 @@ private fun PlaybackSkinLayout(
                 onSeek = onSeek,
             )
 
-            else -> Row(
-            Modifier
-                .fillMaxSize()
-                .offset(x = burnInOffset.first.dp, y = burnInOffset.second.dp)
-                .padding(horizontal = horizontalPadding, vertical = verticalPadding),
+            else -> Box(
+                Modifier
+                    .fillMaxSize()
+                    .offset(x = burnInOffset.first.dp, y = burnInOffset.second.dp),
+            ) {
+            LegacySkinAtmosphere(design)
+            Row(
+                Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = horizontalPadding, vertical = verticalPadding),
             ) {
             if (tokens.artworkPlacement == ArtworkPlacement.LEADING) {
                 Artwork(
@@ -569,7 +575,67 @@ private fun PlaybackSkinLayout(
                 )
             }
             }
+            }
         }
+    }
+}
+
+@Composable
+private fun LegacySkinAtmosphere(design: DisplayDesign) {
+    val atmospherePrimary = PrimaryText
+    val atmosphereSecondary = SecondaryText
+    val atmosphereAccent = Accent
+    when (design) {
+        DisplayDesign.MODERN_REFERENCE -> Box(
+            Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.radialGradient(
+                        listOf(atmosphereAccent.copy(alpha = .045f), Color.Transparent, Background),
+                        radius = 1_350f,
+                    ),
+                ),
+        ) {
+            Canvas(Modifier.fillMaxSize()) {
+                drawLine(
+                    atmospherePrimary.copy(alpha = .055f),
+                    androidx.compose.ui.geometry.Offset(size.width * .48f, size.height * .08f),
+                    androidx.compose.ui.geometry.Offset(size.width * .96f, size.height * .08f),
+                    1.dp.toPx(),
+                )
+                drawLine(
+                    atmosphereSecondary.copy(alpha = .04f),
+                    androidx.compose.ui.geometry.Offset(size.width * .48f, size.height * .92f),
+                    androidx.compose.ui.geometry.Offset(size.width * .96f, size.height * .92f),
+                    1.dp.toPx(),
+                )
+            }
+        }
+        DisplayDesign.STUDIO_LEDGER -> Canvas(Modifier.fillMaxSize()) {
+            val inset = 22.dp.toPx()
+            drawRect(
+                atmosphereSecondary.copy(alpha = .055f),
+                topLeft = androidx.compose.ui.geometry.Offset(inset, inset),
+                size = androidx.compose.ui.geometry.Size(size.width - inset * 2, size.height - inset * 2),
+                style = Stroke(1.dp.toPx()),
+            )
+            repeat(12) { index ->
+                val x = inset + (size.width - inset * 2) * index / 11f
+                drawLine(
+                    atmosphereSecondary.copy(alpha = if (index % 3 == 0) .035f else .018f),
+                    androidx.compose.ui.geometry.Offset(x, inset),
+                    androidx.compose.ui.geometry.Offset(x, size.height - inset),
+                    1.dp.toPx(),
+                )
+            }
+            drawLine(
+                atmosphereAccent.copy(alpha = .22f),
+                androidx.compose.ui.geometry.Offset(inset, inset),
+                androidx.compose.ui.geometry.Offset(size.width * .22f, inset),
+                1.dp.toPx(),
+            )
+        }
+        else -> Unit
     }
 }
 
@@ -715,7 +781,7 @@ private fun MonolithEditorialMetadata(state: MediaUiState, compact: Boolean) {
         artist = state.artist?.takeUnless(String::isBlank),
         album = state.album?.takeUnless(String::isBlank),
     )
-    Crossfade(track, animationSpec = tween(420), label = "monolith editorial metadata") { copy ->
+    TrackCopyTransition(track, DisplayDesign.MONOLITH_GLASS, "monolith editorial metadata") { copy ->
         Column(Modifier.fillMaxWidth()) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Box(Modifier.width(22.dp).height(1.dp).background(Accent.copy(alpha = .8f)))
@@ -974,7 +1040,7 @@ private fun CrystalMetadata(state: MediaUiState, compact: Boolean, modifier: Mod
         album = state.album?.takeUnless(String::isBlank),
     )
     Box(modifier.fillMaxWidth(), contentAlignment = Alignment.CenterStart) {
-        Crossfade(copy, animationSpec = tween(460), label = "crystal metadata") { track ->
+        TrackCopyTransition(copy, DisplayDesign.CRYSTAL_ATRIUM, "crystal metadata") { track ->
             Column(Modifier.fillMaxWidth()) {
                 Text(
                     track.title,
@@ -1106,14 +1172,14 @@ private fun PrecisionDeckLayout(
                         .padding(end = if (compact) 22.dp else 42.dp),
                     verticalArrangement = Arrangement.Center,
                 ) {
-                    PrecisionMetadata(
-                        TrackCopy(
-                            title = state.title?.takeUnless(String::isBlank) ?: "Título no disponible",
-                            artist = state.artist?.takeUnless(String::isBlank),
-                            album = state.album?.takeUnless(String::isBlank),
-                        ),
-                        compact,
+                    val precisionTrack = TrackCopy(
+                        title = state.title?.takeUnless(String::isBlank) ?: "Título no disponible",
+                        artist = state.artist?.takeUnless(String::isBlank),
+                        album = state.album?.takeUnless(String::isBlank),
                     )
+                    TrackCopyTransition(precisionTrack, DisplayDesign.PRECISION_DECK, "precision metadata") {
+                        PrecisionMetadata(it, compact)
+                    }
                     Spacer(Modifier.height(if (compact) 16.dp else 26.dp))
                     PrecisionTimebase(state)
                 }
@@ -1330,11 +1396,7 @@ private fun TrackMetadata(
         album = state.album?.takeUnless(String::isBlank),
     )
     Box(modifier, contentAlignment = Alignment.CenterStart) {
-        Crossfade(
-            targetState = copy,
-            animationSpec = tween(420),
-            label = "track metadata",
-        ) { track ->
+        TrackCopyTransition(copy, design, "track metadata") { track ->
             when (design) {
                 DisplayDesign.MODERN_REFERENCE -> ModernMetadata(track, compact)
                 DisplayDesign.STUDIO_LEDGER -> StudioMetadata(track, compact)
@@ -1347,14 +1409,59 @@ private fun TrackMetadata(
 }
 
 @Composable
+private fun TrackCopyTransition(
+    track: TrackCopy,
+    design: DisplayDesign,
+    label: String,
+    content: @Composable (TrackCopy) -> Unit,
+) {
+    AnimatedContent(
+        targetState = track,
+        transitionSpec = {
+            when (design) {
+                DisplayDesign.MODERN_REFERENCE ->
+                    (fadeIn(tween(320, delayMillis = 50)) + slideInVertically(tween(420)) { it / 10 })
+                        .togetherWith(fadeOut(tween(220)) + slideOutVertically(tween(260)) { -it / 14 })
+                DisplayDesign.STUDIO_LEDGER ->
+                    (fadeIn(tween(250)) + slideInHorizontally(tween(380)) { it / 12 })
+                        .togetherWith(fadeOut(tween(180)) + slideOutHorizontally(tween(260)) { -it / 16 })
+                DisplayDesign.MONOLITH_GLASS ->
+                    (fadeIn(tween(420, delayMillis = 70)) + slideInHorizontally(tween(560)) { it / 20 })
+                        .togetherWith(fadeOut(tween(260)))
+                DisplayDesign.PRECISION_DECK ->
+                    (fadeIn(tween(220)) + slideInVertically(tween(300)) { it / 12 })
+                        .togetherWith(fadeOut(tween(150)) + slideOutVertically(tween(220)) { -it / 18 })
+                DisplayDesign.CRYSTAL_ATRIUM ->
+                    (fadeIn(tween(440, delayMillis = 60)) + scaleIn(tween(520), initialScale = .975f))
+                        .togetherWith(fadeOut(tween(260)))
+            }
+        },
+        label = label,
+    ) { content(it) }
+}
+
+@Composable
 private fun ModernMetadata(track: TrackCopy, compact: Boolean) {
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.Center) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.size(4.dp).clip(CircleShape).background(Accent.copy(alpha = .84f)))
+            Spacer(Modifier.width(8.dp))
+            Text(
+                "REFERENCE / ACTIVE SESSION",
+                color = SecondaryText.copy(alpha = .68f),
+                fontSize = if (compact) 7.sp else 8.sp,
+                fontFamily = FontFamily.Monospace,
+                letterSpacing = 1.7.sp,
+            )
+        }
+        Spacer(Modifier.height(if (compact) 11.dp else 17.dp))
         Text(
             text = track.title,
             color = PrimaryText,
-            fontSize = if (compact) 29.sp else 40.sp,
-            lineHeight = if (compact) 33.sp else 44.sp,
-            fontWeight = FontWeight.Medium,
+            fontSize = if (compact) 31.sp else 44.sp,
+            lineHeight = if (compact) 34.sp else 47.sp,
+            fontWeight = FontWeight.Light,
+            letterSpacing = (-.35).sp,
             maxLines = if (compact) 1 else 2,
             overflow = TextOverflow.Ellipsis,
         )
@@ -1392,13 +1499,13 @@ private fun StudioMetadata(track: TrackCopy, compact: Boolean) {
             Modifier
                 .width(2.dp)
                 .height(if (compact) 112.dp else 154.dp)
-                .background(Accent.copy(alpha = .82f)),
+                .background(Accent.copy(alpha = .52f)),
         )
         Spacer(Modifier.width(if (compact) 14.dp else 20.dp))
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.Center) {
             Text(
                 text = "PROGRAM / NOW PLAYING",
-                color = Accent.copy(alpha = .82f),
+                color = Accent.copy(alpha = .72f),
                 fontSize = if (compact) 8.sp else 9.sp,
                 fontFamily = FontFamily.Monospace,
                 letterSpacing = 1.8.sp,
@@ -1512,7 +1619,7 @@ private fun PrecisionMetadataLine(label: String, value: String, compact: Boolean
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
         Text(
             label,
-            color = Accent.copy(alpha = if (primary) .9f else .64f),
+            color = if (primary) Accent.copy(alpha = .82f) else SecondaryText.copy(alpha = .62f),
             fontSize = if (compact) 7.sp else 8.sp,
             fontFamily = FontFamily.Monospace,
             letterSpacing = 1.1.sp,
@@ -1823,24 +1930,24 @@ private fun MotionPreviewWindow(motion: ArtworkMotion, replayId: Long) {
         ArtworkMotion.FOCUS -> AnimatedContent(
             targetState = replayId,
             transitionSpec = {
-                (fadeIn(tween(durationMillis = 520, delayMillis = 40)) +
-                    scaleIn(tween(durationMillis = 720), initialScale = .94f))
-                    .togetherWith(fadeOut(tween(durationMillis = 280)))
+                (fadeIn(tween(durationMillis = 480, delayMillis = 30)) +
+                    scaleIn(tween(durationMillis = 680), initialScale = .9f))
+                    .togetherWith(fadeOut(tween(durationMillis = 240)))
             },
             label = "focus preview",
         ) { MotionPreviewFrame(it) }
 
         ArtworkMotion.DISSOLVE -> Crossfade(
             targetState = replayId,
-            animationSpec = tween(620),
+            animationSpec = tween(700),
             label = "dissolve preview",
         ) { MotionPreviewFrame(it) }
 
         ArtworkMotion.DECK -> AnimatedContent(
             targetState = replayId,
             transitionSpec = {
-                (fadeIn(tween(420)) + slideInHorizontally(tween(560)) { it / 8 })
-                    .togetherWith(fadeOut(tween(300)) + slideOutHorizontally(tween(480)) { -it / 12 })
+                (fadeIn(tween(360)) + slideInHorizontally(tween(520)) { it / 4 })
+                    .togetherWith(fadeOut(tween(260)) + slideOutHorizontally(tween(440)) { -it / 6 })
             },
             label = "deck preview",
         ) { MotionPreviewFrame(it) }
@@ -2240,20 +2347,13 @@ private fun Artwork(
         translationY = playbackVisual.translationY
     }
     when (design.tokens.artworkTreatment) {
-        ArtworkTreatment.REFERENCE -> ReferenceArtwork(state, design, motion, pressed, controlCue, playbackVisual.haloAlpha, animatedModifier)
-        ArtworkTreatment.STUDIO_DECK -> StudioArtworkDeck(state, design, motion, pressed, controlCue, playbackVisual.haloAlpha, animatedModifier)
-        ArtworkTreatment.MONOLITH_GLASS -> MonolithGlassArtwork(state, design, motion, pressed, controlCue, playbackVisual.haloAlpha, animatedModifier)
-        ArtworkTreatment.PRECISION_DIAL -> PrecisionDialArtwork(state, design, motion, pressed, controlCue, playbackVisual.haloAlpha, animatedModifier)
-        ArtworkTreatment.CRYSTAL_FLOAT -> CrystalFloatArtwork(state, design, motion, pressed, playbackVisual.haloAlpha, animatedModifier)
+        ArtworkTreatment.REFERENCE -> ReferenceArtwork(state, design, motion, pressed, controlCue, playbackVisual, animatedModifier)
+        ArtworkTreatment.STUDIO_DECK -> StudioArtworkDeck(state, design, motion, pressed, controlCue, playbackVisual, animatedModifier)
+        ArtworkTreatment.MONOLITH_GLASS -> MonolithGlassArtwork(state, design, motion, pressed, controlCue, playbackVisual, animatedModifier)
+        ArtworkTreatment.PRECISION_DIAL -> PrecisionDialArtwork(state, design, motion, pressed, controlCue, playbackVisual, animatedModifier)
+        ArtworkTreatment.CRYSTAL_FLOAT -> CrystalFloatArtwork(state, design, motion, pressed, playbackVisual, animatedModifier)
     }
 }
-
-private data class PlaybackArtworkVisual(
-    val scale: Float = 1f,
-    val translationX: Float = 0f,
-    val translationY: Float = 0f,
-    val haloAlpha: Float = 0f,
-)
 
 @Composable
 private fun rememberPlaybackArtworkVisual(
@@ -2265,9 +2365,9 @@ private fun rememberPlaybackArtworkVisual(
         phase.snapTo(0f)
         if (isPlaying && effect != PlaybackArtworkEffect.STILL) {
             val halfCycleMs = when (effect) {
-                PlaybackArtworkEffect.PULSE -> 720
-                PlaybackArtworkEffect.DRIFT -> 5_200
-                PlaybackArtworkEffect.HALO -> 1_650
+                PlaybackArtworkEffect.PULSE -> 640
+                PlaybackArtworkEffect.DRIFT -> 4_800
+                PlaybackArtworkEffect.HALO -> 1_450
                 PlaybackArtworkEffect.STILL -> 1
             }
             while (true) {
@@ -2276,23 +2376,7 @@ private fun rememberPlaybackArtworkVisual(
             }
         }
     }
-    if (!isPlaying) return PlaybackArtworkVisual()
-    return when (effect) {
-        PlaybackArtworkEffect.PULSE -> PlaybackArtworkVisual(
-            scale = 1f + phase.value * .012f,
-            haloAlpha = .08f + phase.value * .16f,
-        )
-        PlaybackArtworkEffect.DRIFT -> PlaybackArtworkVisual(
-            scale = 1.018f + phase.value * .012f,
-            translationX = -3f + phase.value * 6f,
-            translationY = 2f - phase.value * 4f,
-            haloAlpha = .08f,
-        )
-        PlaybackArtworkEffect.HALO -> PlaybackArtworkVisual(
-            haloAlpha = .08f + phase.value * .22f,
-        )
-        PlaybackArtworkEffect.STILL -> PlaybackArtworkVisual()
-    }
+    return resolvePlaybackArtworkVisual(effect, phase.value, isPlaying)
 }
 
 @Composable
@@ -2302,7 +2386,7 @@ private fun ReferenceArtwork(
     motion: ArtworkMotion,
     pressed: Boolean,
     controlCue: ControlCue?,
-    haloAlpha: Float,
+    playbackVisual: PlaybackArtworkVisual,
     modifier: Modifier,
 ) {
     val frameShape = RoundedCornerShape(design.tokens.artworkCornerRadius)
@@ -2315,10 +2399,19 @@ private fun ReferenceArtwork(
         modifier
             .clip(frameShape)
             .background(Brush.linearGradient(listOf(SurfaceRaised, Surface)))
-            .border(1.dp, if (haloAlpha > 0f) Accent.copy(alpha = haloAlpha) else frameColor, frameShape),
+            .border(1.dp, if (playbackVisual.haloAlpha > 0f) Accent.copy(alpha = playbackVisual.haloAlpha) else frameColor, frameShape),
         contentAlignment = Alignment.Center,
     ) {
         ArtworkVisual(state, motion)
+        if (playbackVisual.sheenAlpha > 0f) {
+            Box(
+                Modifier.fillMaxSize().background(
+                    Brush.linearGradient(
+                        listOf(PrimaryText.copy(alpha = playbackVisual.sheenAlpha), Color.Transparent, Color.Transparent),
+                    ),
+                ),
+            )
+        }
         if (pressed) Box(Modifier.fillMaxSize().background(Accent.copy(alpha = .025f)))
         ControlStateCue(controlCue, Modifier.align(Alignment.BottomCenter).padding(bottom = 16.dp))
     }
@@ -2331,7 +2424,7 @@ private fun StudioArtworkDeck(
     motion: ArtworkMotion,
     pressed: Boolean,
     controlCue: ControlCue?,
-    haloAlpha: Float,
+    playbackVisual: PlaybackArtworkVisual,
     modifier: Modifier,
 ) {
     val shape = RoundedCornerShape(design.tokens.artworkCornerRadius)
@@ -2344,7 +2437,7 @@ private fun StudioArtworkDeck(
         modifier
             .clip(shape)
             .background(Surface.copy(alpha = .94f))
-            .border(1.dp, if (haloAlpha > 0f) Accent.copy(alpha = haloAlpha) else frameColor, shape)
+            .border(1.dp, if (playbackVisual.haloAlpha > 0f) Accent.copy(alpha = playbackVisual.haloAlpha) else frameColor, shape)
             .padding(12.dp),
     ) {
         Row(Modifier.fillMaxWidth().height(18.dp), verticalAlignment = Alignment.Top) {
@@ -2366,11 +2459,19 @@ private fun StudioArtworkDeck(
                 .background(SurfaceRaised),
         ) {
             ArtworkVisual(state, motion)
+            if (playbackVisual.sheenAlpha > 0f) {
+                Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(PrimaryText.copy(alpha = playbackVisual.sheenAlpha), Color.Transparent))))
+            }
             if (pressed) Box(Modifier.fillMaxSize().background(Accent.copy(alpha = .025f)))
             ControlStateCue(controlCue, Modifier.align(Alignment.BottomCenter).padding(bottom = 12.dp))
         }
         Row(Modifier.fillMaxWidth().height(24.dp), verticalAlignment = Alignment.Bottom) {
-            Box(Modifier.size(5.dp).clip(CircleShape).background(if (state.isPlaying) Accent else SecondaryText.copy(alpha = .35f)))
+            Box(
+                Modifier
+                    .size(if (state.isPlaying) 5.dp + (2.dp * playbackVisual.haloAlpha) else 5.dp)
+                    .clip(CircleShape)
+                    .background(if (state.isPlaying) Accent.copy(alpha = .72f + playbackVisual.haloAlpha * .28f) else SecondaryText.copy(alpha = .35f)),
+            )
             Spacer(Modifier.width(7.dp))
             Text(
                 (state.sourceApp ?: "MEDIA SESSION").uppercase(),
@@ -2394,7 +2495,7 @@ private fun MonolithGlassArtwork(
     motion: ArtworkMotion,
     pressed: Boolean,
     controlCue: ControlCue?,
-    haloAlpha: Float,
+    playbackVisual: PlaybackArtworkVisual,
     modifier: Modifier,
 ) {
     val shape = RoundedCornerShape(if (design == DisplayDesign.MONOLITH_GLASS) 24.dp else design.tokens.artworkCornerRadius)
@@ -2404,7 +2505,7 @@ private fun MonolithGlassArtwork(
             .background(Surface)
             .border(
                 1.dp,
-                if (haloAlpha > 0f) Accent.copy(alpha = haloAlpha * .72f) else PrimaryText.copy(alpha = .08f),
+                if (playbackVisual.haloAlpha > 0f) Accent.copy(alpha = playbackVisual.haloAlpha * .72f) else PrimaryText.copy(alpha = .08f),
                 shape,
             ),
     ) {
@@ -2414,7 +2515,12 @@ private fun MonolithGlassArtwork(
                 .fillMaxSize()
                 .background(
                     Brush.verticalGradient(
-                        listOf(PrimaryText.copy(alpha = .035f), Color.Transparent, Background.copy(alpha = .34f)),
+                        listOf(
+                            PrimaryText.copy(alpha = .035f + playbackVisual.sheenAlpha * .35f),
+                            Color.Transparent,
+                            Accent.copy(alpha = playbackVisual.haloAlpha * .08f),
+                            Background.copy(alpha = .34f),
+                        ),
                     ),
                 ),
         )
@@ -2435,7 +2541,7 @@ private fun PrecisionDialArtwork(
     motion: ArtworkMotion,
     pressed: Boolean,
     controlCue: ControlCue?,
-    haloAlpha: Float,
+    playbackVisual: PlaybackArtworkVisual,
     modifier: Modifier,
 ) {
     val duration = state.durationMs?.takeIf { it > 0L }
@@ -2454,13 +2560,13 @@ private fun PrecisionDialArtwork(
             drawCircle(dialSecondary.copy(alpha = .045f), radius = outer - 10.dp.toPx(), style = Stroke(1.dp.toPx()))
             if (duration != null) {
                 drawArc(
-                    color = dialAccent.copy(alpha = maxOf(.64f, haloAlpha)),
+                    color = dialAccent.copy(alpha = (.54f + playbackVisual.haloAlpha).coerceAtMost(.96f)),
                     startAngle = -90f,
                     sweepAngle = 360f * fraction,
                     useCenter = false,
                     topLeft = androidx.compose.ui.geometry.Offset(center.x - outer, center.y - outer),
                     size = androidx.compose.ui.geometry.Size(outer * 2, outer * 2),
-                    style = Stroke(2.dp.toPx()),
+                    style = Stroke((2.dp + 2.dp * playbackVisual.haloAlpha).toPx()),
                 )
             }
             repeat(48) { index ->
@@ -2507,7 +2613,7 @@ private fun CrystalFloatArtwork(
     design: DisplayDesign,
     motion: ArtworkMotion,
     pressed: Boolean,
-    haloAlpha: Float,
+    playbackVisual: PlaybackArtworkVisual,
     modifier: Modifier,
 ) {
     val outerShape = RoundedCornerShape(design.tokens.artworkCornerRadius)
@@ -2516,7 +2622,7 @@ private fun CrystalFloatArtwork(
         modifier
             .clip(outerShape)
             .background(Brush.linearGradient(listOf(PrimaryText.copy(alpha = .18f), Accent.copy(alpha = .055f), Surface.copy(alpha = .3f))))
-            .border(1.dp, PrimaryText.copy(alpha = maxOf(.22f, haloAlpha)), outerShape)
+            .border(1.dp, PrimaryText.copy(alpha = maxOf(.22f, playbackVisual.haloAlpha)), outerShape)
             .padding(5.dp),
     ) {
         Box(
@@ -2533,7 +2639,7 @@ private fun CrystalFloatArtwork(
                     .background(
                         Brush.linearGradient(
                             colorStops = arrayOf(
-                                0f to PrimaryText.copy(alpha = .13f),
+                                0f to PrimaryText.copy(alpha = .13f + playbackVisual.sheenAlpha),
                                 .24f to Color.Transparent,
                                 .78f to Color.Transparent,
                                 1f to Background.copy(alpha = .18f),
@@ -2546,7 +2652,7 @@ private fun CrystalFloatArtwork(
                     .align(Alignment.TopCenter)
                     .fillMaxWidth(.72f)
                     .height(1.dp)
-                    .background(Brush.horizontalGradient(listOf(Color.Transparent, PrimaryText.copy(alpha = .64f), Color.Transparent))),
+                    .background(Brush.horizontalGradient(listOf(Color.Transparent, PrimaryText.copy(alpha = (.64f + playbackVisual.sheenAlpha).coerceAtMost(.9f)), Color.Transparent))),
             )
             if (pressed) Box(Modifier.fillMaxSize().background(PrimaryText.copy(alpha = .07f)))
         }
@@ -2716,24 +2822,24 @@ private fun ArtworkVisual(state: MediaUiState, motion: ArtworkMotion) {
         ArtworkMotion.FOCUS -> AnimatedContent(
             targetState = frame,
             transitionSpec = {
-                (fadeIn(tween(durationMillis = 520, delayMillis = 40)) +
-                    scaleIn(tween(durationMillis = 720), initialScale = .94f))
-                    .togetherWith(fadeOut(tween(durationMillis = 280)))
+                (fadeIn(tween(durationMillis = 480, delayMillis = 30)) +
+                    scaleIn(tween(durationMillis = 680), initialScale = .9f))
+                    .togetherWith(fadeOut(tween(durationMillis = 240)))
             },
             label = "artwork focus",
         ) { ArtworkFrameContent(it) }
 
         ArtworkMotion.DISSOLVE -> Crossfade(
             targetState = frame,
-            animationSpec = tween(620),
+            animationSpec = tween(700),
             label = "artwork dissolve",
         ) { ArtworkFrameContent(it) }
 
         ArtworkMotion.DECK -> AnimatedContent(
             targetState = frame,
             transitionSpec = {
-                (fadeIn(tween(420)) + slideInHorizontally(tween(560)) { it / 8 })
-                    .togetherWith(fadeOut(tween(300)) + slideOutHorizontally(tween(480)) { -it / 12 })
+                (fadeIn(tween(360)) + slideInHorizontally(tween(520)) { it / 4 })
+                    .togetherWith(fadeOut(tween(260)) + slideOutHorizontally(tween(440)) { -it / 6 })
             },
             label = "artwork deck",
         ) { ArtworkFrameContent(it) }
@@ -2866,6 +2972,8 @@ private fun ControlButton(
     val interactionSource = remember { MutableInteractionSource() }
     val pressed by interactionSource.collectIsPressedAsState()
     val view = LocalView.current
+    val feedback = remember { Animatable(1f) }
+    val feedbackScope = rememberCoroutineScope()
     val scale by animateFloatAsState(
         targetValue = if (pressed) .93f else 1f,
         animationSpec = tween(100),
@@ -2916,11 +3024,26 @@ private fun ControlButton(
                 role = Role.Button,
                 onClick = {
                     view.performPremiumHaptic(strong = primary)
+                    feedbackScope.launch {
+                        feedback.snapTo(0f)
+                        feedback.animateTo(1f, tween(320))
+                    }
                     action()
                 },
             ),
         contentAlignment = Alignment.Center,
     ) {
+        Box(
+            Modifier
+                .fillMaxSize()
+                .graphicsLayer {
+                    val pulseScale = .68f + feedback.value * .32f
+                    scaleX = pulseScale
+                    scaleY = pulseScale
+                    alpha = 1f - feedback.value
+                }
+                .border(2.dp, if (primary) Accent else PrimaryText.copy(alpha = .78f), shape),
+        )
         Icon(
             imageVector = icon,
             contentDescription = label,
