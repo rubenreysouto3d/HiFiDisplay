@@ -38,3 +38,7 @@ Suggested device compatibility pass:
 | YouTube Music | ☐ | ☐ | ☐ | ☐ | ☐ |
 | Poweramp | ☐ | ☐ | ☐ | ☐ | ☐ |
 | Other player | ☐ | ☐ | ☐ | ☐ | ☐ |
+
+## v0.5 sources and skins
+
+Tap the source application name to choose automatic session following or pin a specific active media app. The same panel switches between the original Hi-Fi Green skin and Warm Amber; both choices persist across launches. Long-pressing the source name still opens session diagnostics.

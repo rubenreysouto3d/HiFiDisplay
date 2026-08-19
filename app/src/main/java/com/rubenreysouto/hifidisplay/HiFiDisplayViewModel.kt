@@ -3,11 +3,15 @@ package com.rubenreysouto.hifidisplay
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import com.rubenreysouto.hifidisplay.media.MediaSessionRepository
+import com.rubenreysouto.hifidisplay.preferences.DisplayPreferencesRepository
+import com.rubenreysouto.hifidisplay.ui.DisplaySkin
 
 class HiFiDisplayViewModel(application: Application) : AndroidViewModel(application) {
     private val repository = MediaSessionRepository.get(application)
+    private val displayPreferences = DisplayPreferencesRepository(application)
 
     val state = repository.state
+    val skin = displayPreferences.skin
 
     fun onResume() = repository.onResume()
     fun onPause() = repository.onPause()
@@ -17,4 +21,5 @@ class HiFiDisplayViewModel(application: Application) : AndroidViewModel(applicat
     fun next() = repository.next()
     fun seekTo(positionMs: Long) = repository.seekTo(positionMs)
     fun selectSource(packageName: String?) = repository.selectSource(packageName)
+    fun selectSkin(skin: DisplaySkin) = displayPreferences.selectSkin(skin)
 }

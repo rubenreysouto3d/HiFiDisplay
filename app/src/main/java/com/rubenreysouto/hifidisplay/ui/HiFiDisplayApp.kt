@@ -5,8 +5,10 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
@@ -28,30 +30,55 @@ import com.rubenreysouto.hifidisplay.media.MediaUiState
 import com.rubenreysouto.hifidisplay.media.SessionAvailability
 import kotlin.math.roundToLong
 
-private val Background = Color(0xFF090B0D)
-private val Surface = Color(0xFF111519)
-private val SurfaceRaised = Color(0xFF20262B)
-private val PrimaryText = Color(0xFFF4F6F0)
-private val SecondaryText = Color(0xFF929A92)
-private val Accent = Color(0xFFD6FF7F)
+private val Background: Color @Composable get() = MaterialTheme.colorScheme.background
+private val Surface: Color @Composable get() = MaterialTheme.colorScheme.surface
+private val SurfaceRaised: Color @Composable get() = MaterialTheme.colorScheme.surfaceVariant
+private val PrimaryText: Color @Composable get() = MaterialTheme.colorScheme.onBackground
+private val SecondaryText: Color @Composable get() = MaterialTheme.colorScheme.onSurfaceVariant
+private val Accent: Color @Composable get() = MaterialTheme.colorScheme.primary
 
 @Composable
 fun HiFiDisplayApp(
     state: MediaUiState,
+    skin: DisplaySkin,
     onOpenAccessSettings: () -> Unit,
     onPlay: () -> Unit,
     onPause: () -> Unit,
     onPrevious: () -> Unit,
     onNext: () -> Unit,
     onSeek: (Long) -> Unit,
+    onSelectSource: (String?) -> Unit,
+    onSelectSkin: (DisplaySkin) -> Unit,
 ) {
-    MaterialTheme(colorScheme = darkColorScheme(background = Background, surface = Surface, primary = Accent)) {
+    val palette = skin.palette
+    MaterialTheme(
+        colorScheme = darkColorScheme(
+            background = palette.background,
+            surface = palette.surface,
+            surfaceVariant = palette.surfaceRaised,
+            onBackground = palette.primaryText,
+            onSurface = palette.primaryText,
+            onSurfaceVariant = palette.secondaryText,
+            primary = palette.accent,
+            onPrimary = palette.background,
+        ),
+    ) {
         Surface(modifier = Modifier.fillMaxSize(), color = Background) {
             when (state.availability) {
                 SessionAvailability.PERMISSION_REQUIRED -> AccessRequired(onOpenAccessSettings)
                 SessionAvailability.NO_SESSION -> EmptySession()
                 SessionAvailability.ERROR -> SessionError()
-                SessionAvailability.ACTIVE -> NowPlaying(state, onPlay, onPause, onPrevious, onNext, onSeek)
+                SessionAvailability.ACTIVE -> NowPlaying(
+                    state = state,
+                    skin = skin,
+                    onPlay = onPlay,
+                    onPause = onPause,
+                    onPrevious = onPrevious,
+                    onNext = onNext,
+                    onSeek = onSeek,
+                    onSelectSource = onSelectSource,
+                    onSelectSkin = onSelectSkin,
+                )
             }
         }
     }
@@ -120,18 +147,26 @@ private fun EmptySession() {
 @Composable
 private fun NowPlaying(
     state: MediaUiState,
+    skin: DisplaySkin,
     onPlay: () -> Unit,
     onPause: () -> Unit,
     onPrevious: () -> Unit,
     onNext: () -> Unit,
     onSeek: (Long) -> Unit,
+    onSelectSource: (String?) -> Unit,
+    onSelectSkin: (DisplaySkin) -> Unit,
 ) {
     var showDiagnostics by remember { mutableStateOf(false) }
+    var showSourcePicker by remember { mutableStateOf(false) }
     Box(Modifier.fillMaxSize()) {
         Row(Modifier.fillMaxSize().padding(horizontal = 36.dp, vertical = 28.dp), horizontalArrangement = Arrangement.spacedBy(40.dp)) {
             Artwork(state, Modifier.fillMaxHeight().aspectRatio(1f))
             Column(Modifier.weight(1f).fillMaxHeight()) {
-                SourceHeader(state, onShowDiagnostics = { showDiagnostics = true })
+                SourceHeader(
+                    state = state,
+                    onShowSources = { showSourcePicker = true },
+                    onShowDiagnostics = { showDiagnostics = true },
+                )
                 Spacer(Modifier.weight(0.7f))
                 Text(state.title ?: "Título no disponible", color = PrimaryText, fontSize = 38.sp, fontWeight = FontWeight.Medium, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 Spacer(Modifier.height(12.dp))
@@ -146,14 +181,33 @@ private fun NowPlaying(
             }
         }
         if (showDiagnostics) DiagnosticsOverlay(state, onDismiss = { showDiagnostics = false })
+        if (showSourcePicker) {
+            SourcePickerOverlay(
+                state = state,
+                skin = skin,
+                onSelectSource = {
+                    onSelectSource(it)
+                    showSourcePicker = false
+                },
+                onSelectSkin = onSelectSkin,
+                onDismiss = { showSourcePicker = false },
+            )
+        }
     }
 }
 
 @Composable
-private fun SourceHeader(state: MediaUiState, onShowDiagnostics: () -> Unit) {
+private fun SourceHeader(
+    state: MediaUiState,
+    onShowSources: () -> Unit,
+    onShowDiagnostics: () -> Unit,
+) {
     Row(
         modifier = Modifier.pointerInput(Unit) {
-            detectTapGestures(onLongPress = { onShowDiagnostics() })
+            detectTapGestures(
+                onTap = { onShowSources() },
+                onLongPress = { onShowDiagnostics() },
+            )
         },
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -171,6 +225,115 @@ private fun SourceHeader(state: MediaUiState, onShowDiagnostics: () -> Unit) {
             fontFamily = FontFamily.Monospace,
             letterSpacing = 1.7.sp,
         )
+        Spacer(Modifier.width(5.dp))
+        Icon(Icons.Rounded.ExpandMore, "Cambiar fuente", tint = SecondaryText, modifier = Modifier.size(16.dp))
+    }
+}
+
+@Composable
+private fun SourcePickerOverlay(
+    state: MediaUiState,
+    skin: DisplaySkin,
+    onSelectSource: (String?) -> Unit,
+    onSelectSkin: (DisplaySkin) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Background.copy(alpha = .98f))
+            .padding(horizontal = 48.dp, vertical = 30.dp),
+    ) {
+        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    "SOURCE / DISPLAY",
+                    color = Accent,
+                    fontSize = 13.sp,
+                    fontFamily = FontFamily.Monospace,
+                    letterSpacing = 2.sp,
+                    modifier = Modifier.weight(1f),
+                )
+                IconButton(onClick = onDismiss, modifier = Modifier.size(36.dp)) {
+                    Icon(Icons.Rounded.Close, "Cerrar", tint = SecondaryText)
+                }
+            }
+            Spacer(Modifier.height(18.dp))
+            Text("FUENTE", color = SecondaryText, fontSize = 10.sp, fontFamily = FontFamily.Monospace, letterSpacing = 1.5.sp)
+            Spacer(Modifier.height(7.dp))
+            PickerRow(
+                title = "AUTO",
+                subtitle = "Sigue la sesión con mayor actividad",
+                selected = state.pinnedSourcePackage == null,
+                onClick = { onSelectSource(null) },
+            )
+            val pinnedUnavailable = state.pinnedSourcePackage?.takeIf { pinned ->
+                state.availableSources.none { it.packageName == pinned }
+            }
+            pinnedUnavailable?.let { packageName ->
+                PickerRow(
+                    title = packageName,
+                    subtitle = "PINNED · NOT ACTIVE",
+                    selected = true,
+                    onClick = { onSelectSource(packageName) },
+                )
+            }
+            state.availableSources.forEach { source ->
+                val status = buildList {
+                    if (source.isPlaying) add("PLAYING")
+                    if (source.isSelected) add("ACTIVE")
+                    if (source.isPinned) add("PINNED")
+                }.joinToString(" · ").ifBlank { source.packageName }
+                PickerRow(
+                    title = source.label,
+                    subtitle = status,
+                    selected = source.isPinned,
+                    onClick = { onSelectSource(source.packageName) },
+                )
+            }
+            Spacer(Modifier.height(22.dp))
+            Text("SKIN", color = SecondaryText, fontSize = 10.sp, fontFamily = FontFamily.Monospace, letterSpacing = 1.5.sp)
+            Spacer(Modifier.height(7.dp))
+            DisplaySkin.entries.forEach { option ->
+                PickerRow(
+                    title = option.displayName,
+                    subtitle = option.storageKey.uppercase(),
+                    selected = skin == option,
+                    onClick = { onSelectSkin(option) },
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun PickerRow(
+    title: String,
+    subtitle: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(4.dp))
+            .background(if (selected) Accent.copy(alpha = .12f) else Color.Transparent)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 9.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            Modifier
+                .size(7.dp)
+                .clip(CircleShape)
+                .background(if (selected) Accent else SecondaryText.copy(alpha = .25f)),
+        )
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f)) {
+            Text(title, color = PrimaryText, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(subtitle, color = SecondaryText, fontSize = 9.sp, fontFamily = FontFamily.Monospace, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+        if (selected) Text("SELECTED", color = Accent, fontSize = 9.sp, fontFamily = FontFamily.Monospace)
     }
 }
 
