@@ -39,6 +39,7 @@ class MainActivity : ComponentActivity() {
                 onSelectSource = viewModel::selectSource,
                 onSelectDesign = viewModel::selectDesign,
                 onSelectPalette = viewModel::selectPalette,
+                onSelectArtworkMotion = viewModel::selectArtworkMotion,
             )
         }
     }

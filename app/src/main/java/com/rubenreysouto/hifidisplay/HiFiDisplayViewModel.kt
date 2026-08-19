@@ -4,6 +4,7 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import com.rubenreysouto.hifidisplay.media.MediaSessionRepository
 import com.rubenreysouto.hifidisplay.preferences.DisplayPreferencesRepository
+import com.rubenreysouto.hifidisplay.ui.ArtworkMotion
 import com.rubenreysouto.hifidisplay.ui.ColorPalette
 import com.rubenreysouto.hifidisplay.ui.DisplayDesign
 
@@ -24,4 +25,5 @@ class HiFiDisplayViewModel(application: Application) : AndroidViewModel(applicat
     fun selectSource(packageName: String?) = repository.selectSource(packageName)
     fun selectPalette(palette: ColorPalette) = displayPreferences.selectPalette(palette)
     fun selectDesign(design: DisplayDesign) = displayPreferences.selectDesign(design)
+    fun selectArtworkMotion(motion: ArtworkMotion) = displayPreferences.selectArtworkMotion(motion)
 }

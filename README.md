@@ -52,3 +52,9 @@ During active playback, the compact source badge is the single entry point for s
 Display structure is now driven by independent design tokens instead of being hard-coded into a single screen. `Modern Reference` keeps the balanced leading-artwork composition, while `Studio Ledger` introduces trailing deck artwork, indexed typography, console controls, a ticked timeline, and a dedicated transient transport rail. Both designs use the same media state and capability rules, and either can be combined with `Hi-Fi Green` or `Warm Amber` without changing layout.
 
 The source/display panel presents both designs as visual previews, shows palette swatches explicitly as color-only choices, updates immediately, persists the selection, and keeps its close action fixed while content scrolls. Layout modes cover compact, standard, and wide landscape displays; 16:9 and 20:9 emulator passes verify that metadata, source, controls, progress, and artwork stay within their zones. The custom seek control also publishes adjustable progress semantics for accessibility.
+
+## v0.8 tactile finish and cutout safety
+
+The playback surface now respects Android display-cutout insets while remaining immersive, keeping artwork and metadata clear of landscape camera holes. Interactive surfaces use restrained custom press states and system-respecting haptic confirmation for reveal, transport, selection, and completed seek actions rather than generic Material ripples.
+
+Artwork motion is independent from design and palette and persists across launches. `Focus` introduces the next cover with subtle depth, `Dissolve` uses a scale-free crossfade, and `Direct` disables the transition. Transitions are keyed to meaningful track/source changes, so repeated bitmap instances from a media-session callback no longer restart the animation or create a periodic flash.
