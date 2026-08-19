@@ -29,6 +29,9 @@ class MediaSessionRepository private constructor(context: Context) {
     private var sessionErrorMessage: String? = null
     private var tickerRunning = false
     private var sessionsListenerRegistered = false
+    private var isVisible = false
+    private var retryAttempt = 0
+    private var retryScheduled = false
     private val applicationLabels = mutableMapOf<String, String>()
     private val callback = object : MediaController.Callback() {
         override fun onMetadataChanged(metadata: MediaMetadata?) = publishState()
@@ -42,13 +45,17 @@ class MediaSessionRepository private constructor(context: Context) {
             if (tickerRunning) handler.postDelayed(this, 1_000L)
         }
     }
+    private val retry = Runnable {
+        retryScheduled = false
+        if (isVisible) refreshSessions()
+    }
 
     init {
         instance = this
-        refreshAccessAndListener()
     }
 
     fun onResume() {
+        isVisible = true
         refreshAccessAndListener()
         if (!tickerRunning) {
             tickerRunning = true
@@ -57,8 +64,12 @@ class MediaSessionRepository private constructor(context: Context) {
     }
 
     fun onPause() {
+        isVisible = false
         tickerRunning = false
         handler.removeCallbacks(ticker)
+        cancelRetry(resetAttempt = false)
+        detachSessionsListener()
+        updateObservedControllers(emptyList())
     }
 
     private fun hasAccess(): Boolean =
@@ -77,10 +88,17 @@ class MediaSessionRepository private constructor(context: Context) {
         refreshSessions()
     }
 
+    private fun detachSessionsListener() {
+        if (!sessionsListenerRegistered) return
+        runCatching { sessionManager.removeOnActiveSessionsChangedListener(sessionsChangedListener) }
+        sessionsListenerRegistered = false
+    }
+
     private fun refreshSessions() {
         val access = hasAccess()
         if (!access) {
             sessionErrorMessage = null
+            cancelRetry()
             updateObservedControllers(emptyList())
             controller = null
             publishState()
@@ -93,10 +111,12 @@ class MediaSessionRepository private constructor(context: Context) {
             updateObservedControllers(emptyList())
             controller = null
             publishState()
+            scheduleRetry()
             return
         }
 
         sessionErrorMessage = null
+        cancelRetry()
         val sessions = sessionsResult.getOrDefault(emptyList())
         updateObservedControllers(sessions)
         val selectedToken = MediaSessionArbitrator.select(
@@ -104,7 +124,7 @@ class MediaSessionRepository private constructor(context: Context) {
                 SessionCandidate(
                     id = it.sessionToken,
                     packageName = it.packageName,
-                    isPlaying = it.safePlaybackState()?.state == PlaybackState.STATE_PLAYING,
+                    playbackStatus = it.safePlaybackState()?.state.toMediaPlaybackStatus(),
                 )
             },
             pinnedPackageName = pinnedSourcePackage,
@@ -122,6 +142,20 @@ class MediaSessionRepository private constructor(context: Context) {
             observedControllers = sessions
             observedControllers.forEach { runCatching { it.registerCallback(callback, handler) } }
         }
+    }
+
+    private fun scheduleRetry() {
+        if (!isVisible || retryScheduled) return
+        val delayMs = SessionRetryPolicy.delayForAttempt(retryAttempt)
+        retryAttempt += 1
+        retryScheduled = true
+        handler.postDelayed(retry, delayMs)
+    }
+
+    private fun cancelRetry(resetAttempt: Boolean = true) {
+        handler.removeCallbacks(retry)
+        retryScheduled = false
+        if (resetAttempt) retryAttempt = 0
     }
 
     private fun publishState() {
@@ -149,22 +183,26 @@ class MediaSessionRepository private constructor(context: Context) {
             else -> SessionAvailability.ACTIVE
         }
         val selectedToken = current?.sessionToken
+        val title = metadata?.getString(MediaMetadata.METADATA_KEY_TITLE).present()
+            ?: metadata?.getString(MediaMetadata.METADATA_KEY_DISPLAY_TITLE).present()
+            ?: metadata?.description?.title?.toString().present()
+        val metadataArtist = metadata?.getString(MediaMetadata.METADATA_KEY_ARTIST).present()
+            ?: metadata?.getString(MediaMetadata.METADATA_KEY_ALBUM_ARTIST).present()
+            ?: metadata?.getString(MediaMetadata.METADATA_KEY_DISPLAY_SUBTITLE).present()
+            ?: metadata?.description?.subtitle?.toString().present()
+        val artist = metadataArtist ?: sourceApp
+        val album = metadata?.getString(MediaMetadata.METADATA_KEY_ALBUM).present()
+        val artwork = metadata?.getBitmap(MediaMetadata.METADATA_KEY_ALBUM_ART)
+            ?: metadata?.getBitmap(MediaMetadata.METADATA_KEY_ART)
+            ?: metadata?.getBitmap(MediaMetadata.METADATA_KEY_DISPLAY_ICON)
         _state.value = MediaUiState(
             availability = availability,
             playbackStatus = playback?.state.toMediaPlaybackStatus(),
             capabilities = actions.toMediaCapabilities(),
-            title = metadata?.getString(MediaMetadata.METADATA_KEY_TITLE).present()
-                ?: metadata?.getString(MediaMetadata.METADATA_KEY_DISPLAY_TITLE).present()
-                ?: metadata?.description?.title?.toString().present(),
-            artist = metadata?.getString(MediaMetadata.METADATA_KEY_ARTIST).present()
-                ?: metadata?.getString(MediaMetadata.METADATA_KEY_ALBUM_ARTIST).present()
-                ?: metadata?.getString(MediaMetadata.METADATA_KEY_DISPLAY_SUBTITLE).present()
-                ?: metadata?.description?.subtitle?.toString().present()
-                ?: sourceApp,
-            album = metadata?.getString(MediaMetadata.METADATA_KEY_ALBUM),
-            artwork = metadata?.getBitmap(MediaMetadata.METADATA_KEY_ALBUM_ART)
-                ?: metadata?.getBitmap(MediaMetadata.METADATA_KEY_ART)
-                ?: metadata?.getBitmap(MediaMetadata.METADATA_KEY_DISPLAY_ICON),
+            title = title,
+            artist = artist,
+            album = album,
+            artwork = artwork,
             sourceApp = sourceApp,
             selectedSourcePackage = current?.packageName,
             pinnedSourcePackage = pinnedSourcePackage,
@@ -182,6 +220,18 @@ class MediaSessionRepository private constructor(context: Context) {
             positionMs = position,
             durationMs = duration,
             errorMessage = sessionErrorMessage,
+            diagnostics = MediaDiagnosticsUiState(
+                packageName = current?.packageName,
+                playbackStatus = playback?.state.toMediaPlaybackStatus(),
+                supportedActions = actions.toSupportedActionNames(),
+                hasTitle = title != null,
+                hasArtist = metadataArtist != null,
+                hasAlbum = album != null,
+                hasArtwork = artwork != null,
+                hasDuration = duration != null,
+                retryAttempt = retryAttempt,
+                errorType = sessionErrorMessage,
+            ),
         )
     }
 
@@ -204,37 +254,39 @@ class MediaSessionRepository private constructor(context: Context) {
         refreshSessions()
     }
 
-    fun play() = withSupportedController(Long::supportsPlay) { it.play() }
+    fun play() = runTransport(MediaTransportDispatcher::play)
 
-    fun pause() = withSupportedController(Long::supportsPause) { it.pause() }
+    fun pause() = runTransport(MediaTransportDispatcher::pause)
 
-    fun previous() = withSupportedController({ it supports PlaybackState.ACTION_SKIP_TO_PREVIOUS }) {
-        it.skipToPrevious()
+    fun previous() = runTransport(MediaTransportDispatcher::previous)
+
+    fun next() = runTransport(MediaTransportDispatcher::next)
+
+    fun seekTo(positionMs: Long) {
+        val duration = controller?.let { current ->
+            runCatching { current.metadata?.getLong(MediaMetadata.METADATA_KEY_DURATION) }.getOrNull()
+        }?.takeIf { it > 0L }
+        runTransport { MediaTransportDispatcher.seek(it, positionMs, duration) }
     }
 
-    fun next() = withSupportedController({ it supports PlaybackState.ACTION_SKIP_TO_NEXT }) {
-        it.skipToNext()
-    }
-
-    fun seekTo(positionMs: Long) = withSupportedController({ it supports PlaybackState.ACTION_SEEK_TO }) {
-        val duration = controller?.metadata
-            ?.getLong(MediaMetadata.METADATA_KEY_DURATION)
-            ?.takeIf { value -> value > 0L }
-        it.seekTo(SeekPositionSanitizer.sanitize(positionMs, duration))
-    }
-
-    private fun withSupportedController(
-        supportsAction: (Long) -> Boolean,
-        command: (MediaController.TransportControls) -> Unit,
-    ) {
+    private fun runTransport(command: (MediaTransport) -> Boolean) {
         val current = controller ?: return
         runCatching {
             val actions = current.playbackState?.actions ?: 0L
-            if (supportsAction(actions)) command(current.transportControls)
+            command(AndroidMediaTransport(current, actions))
         }
     }
 
-    private infix fun Long.supports(action: Long) = this and action != 0L
+    private class AndroidMediaTransport(
+        private val controller: MediaController,
+        override val actions: Long,
+    ) : MediaTransport {
+        override fun play() = controller.transportControls.play()
+        override fun pause() = controller.transportControls.pause()
+        override fun skipToPrevious() = controller.transportControls.skipToPrevious()
+        override fun skipToNext() = controller.transportControls.skipToNext()
+        override fun seekTo(positionMs: Long) = controller.transportControls.seekTo(positionMs)
+    }
 
     private fun MediaController?.safePlaybackState(): PlaybackState? =
         this?.let { runCatching { it.playbackState }.getOrNull() }
@@ -244,6 +296,10 @@ class MediaSessionRepository private constructor(context: Context) {
         @Volatile private var instance: MediaSessionRepository? = null
         fun get(context: Context): MediaSessionRepository = instance
             ?: synchronized(this) { instance ?: MediaSessionRepository(context).also { instance = it } }
-        fun notifySessionEnvironmentChanged() { instance?.handler?.post { instance?.refreshSessions() } }
+        fun notifySessionEnvironmentChanged() {
+            instance?.takeIf { it.isVisible }?.let { repository ->
+                repository.handler.post { repository.refreshSessions() }
+            }
+        }
     }
 }
