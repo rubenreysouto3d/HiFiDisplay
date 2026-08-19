@@ -38,9 +38,17 @@ internal object PlaybackPositionEstimator {
         } else {
             0L
         }
-        val estimated = basePositionMs + (elapsedMs * playbackSpeed).toLong()
+        val safeSpeed = playbackSpeed.takeIf(Float::isFinite) ?: 0f
+        val estimated = basePositionMs + (elapsedMs * safeSpeed).toLong()
         val nonNegative = estimated.coerceAtLeast(0L)
         return durationMs?.takeIf { it > 0L }?.let { nonNegative.coerceAtMost(it) } ?: nonNegative
+    }
+}
+
+internal object SeekPositionSanitizer {
+    fun sanitize(positionMs: Long, durationMs: Long?): Long {
+        val nonNegative = positionMs.coerceAtLeast(0L)
+        return durationMs?.takeIf { it > 0L }?.let(nonNegative::coerceAtMost) ?: nonNegative
     }
 }
 
@@ -53,6 +61,12 @@ internal fun Long.toMediaCapabilities() = MediaCapabilities(
 )
 
 private fun Long.supports(action: Long) = this and action != 0L
+
+internal fun Long.supportsPlay() = supports(PlaybackState.ACTION_PLAY) ||
+    supports(PlaybackState.ACTION_PLAY_PAUSE)
+
+internal fun Long.supportsPause() = supports(PlaybackState.ACTION_PAUSE) ||
+    supports(PlaybackState.ACTION_PLAY_PAUSE)
 
 internal fun Int?.toMediaPlaybackStatus(): MediaPlaybackStatus = when (this) {
     PlaybackState.STATE_CONNECTING -> MediaPlaybackStatus.CONNECTING

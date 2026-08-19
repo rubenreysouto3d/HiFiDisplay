@@ -44,6 +44,18 @@ class MediaSessionCoreTest {
     }
 
     @Test
+    fun `missing pinned source falls back to playing source`() {
+        val candidates = listOf(
+            SessionCandidate(id = "paused", packageName = "paused", isPlaying = false),
+            SessionCandidate(id = "playing", packageName = "playing", isPlaying = true),
+        )
+
+        val selected = MediaSessionArbitrator.select(candidates, "missing", "paused")
+
+        assertEquals("playing", selected)
+    }
+
+    @Test
     fun `position advances using speed and elapsed realtime`() {
         val position = PlaybackPositionEstimator.estimate(
             basePositionMs = 10_000L,
@@ -83,6 +95,41 @@ class MediaSessionCoreTest {
         )
 
         assertEquals(30_000L, position)
+    }
+
+    @Test
+    fun `invalid playback speed does not corrupt position`() {
+        val position = PlaybackPositionEstimator.estimate(
+            basePositionMs = 10_000L,
+            lastUpdateTimeMs = 1_000L,
+            playbackSpeed = Float.NaN,
+            isAdvancing = true,
+            nowMs = 3_000L,
+            durationMs = 30_000L,
+        )
+
+        assertEquals(10_000L, position)
+    }
+
+    @Test
+    fun `rewind speed cannot produce a negative position`() {
+        val position = PlaybackPositionEstimator.estimate(
+            basePositionMs = 1_000L,
+            lastUpdateTimeMs = 1_000L,
+            playbackSpeed = -2f,
+            isAdvancing = true,
+            nowMs = 3_000L,
+            durationMs = 30_000L,
+        )
+
+        assertEquals(0L, position)
+    }
+
+    @Test
+    fun `seek position is clamped to valid media range`() {
+        assertEquals(0L, SeekPositionSanitizer.sanitize(-1_000L, 30_000L))
+        assertEquals(30_000L, SeekPositionSanitizer.sanitize(40_000L, 30_000L))
+        assertEquals(40_000L, SeekPositionSanitizer.sanitize(40_000L, null))
     }
 
     @Test
