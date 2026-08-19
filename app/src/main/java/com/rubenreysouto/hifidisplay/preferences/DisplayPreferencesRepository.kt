@@ -1,6 +1,7 @@
 package com.rubenreysouto.hifidisplay.preferences
 
 import android.content.Context
+import com.rubenreysouto.hifidisplay.ui.ArtworkMotion
 import com.rubenreysouto.hifidisplay.ui.ColorPalette
 import com.rubenreysouto.hifidisplay.ui.DisplayAppearance
 import com.rubenreysouto.hifidisplay.ui.DisplayDesign
@@ -18,6 +19,7 @@ class DisplayPreferencesRepository(context: Context) {
                 preferences.getString(PALETTE_KEY, null)
                     ?: preferences.getString(LEGACY_SKIN_KEY, null),
             ),
+            artworkMotion = ArtworkMotion.fromStorage(preferences.getString(ARTWORK_MOTION_KEY, null)),
         ),
     )
     val appearance: StateFlow<DisplayAppearance> = _appearance.asStateFlow()
@@ -37,10 +39,17 @@ class DisplayPreferencesRepository(context: Context) {
         preferences.edit().putString(DESIGN_KEY, design.storageKey).apply()
     }
 
+    fun selectArtworkMotion(motion: ArtworkMotion) {
+        if (_appearance.value.artworkMotion == motion) return
+        _appearance.value = _appearance.value.copy(artworkMotion = motion)
+        preferences.edit().putString(ARTWORK_MOTION_KEY, motion.storageKey).apply()
+    }
+
     private companion object {
         const val PREFERENCES_NAME = "display_preferences"
         const val DESIGN_KEY = "design"
         const val PALETTE_KEY = "palette"
+        const val ARTWORK_MOTION_KEY = "artwork_motion"
         const val LEGACY_SKIN_KEY = "skin"
     }
 }

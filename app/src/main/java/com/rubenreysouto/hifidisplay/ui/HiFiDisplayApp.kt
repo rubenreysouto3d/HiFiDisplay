@@ -1,5 +1,10 @@
 package com.rubenreysouto.hifidisplay.ui
 
+import android.graphics.Bitmap
+import android.os.Build
+import android.view.HapticFeedbackConstants
+import android.view.View
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.animateColorAsState
@@ -8,6 +13,8 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
@@ -39,6 +46,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.semantics.*
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -70,6 +78,7 @@ fun HiFiDisplayApp(
     onSelectSource: (String?) -> Unit,
     onSelectDesign: (DisplayDesign) -> Unit,
     onSelectPalette: (ColorPalette) -> Unit,
+    onSelectArtworkMotion: (ArtworkMotion) -> Unit,
 ) {
     val colors = appearance.palette.colors
     var showSourcePicker by remember { mutableStateOf(false) }
@@ -103,7 +112,11 @@ fun HiFiDisplayApp(
         ),
     ) {
         Surface(modifier = Modifier.fillMaxSize(), color = Background) {
-            Box(Modifier.fillMaxSize()) {
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .windowInsetsPadding(WindowInsets.displayCutout),
+            ) {
                 when (state.availability) {
                     SessionAvailability.PERMISSION_REQUIRED -> AccessRequired(onOpenAccessSettings)
                     SessionAvailability.NO_SESSION -> EmptySession()
@@ -111,6 +124,7 @@ fun HiFiDisplayApp(
                     SessionAvailability.ACTIVE -> NowPlaying(
                         state = state,
                         design = appearance.design,
+                        artworkMotion = appearance.artworkMotion,
                         onPlay = onPlay,
                         onPause = onPause,
                         onPrevious = onPrevious,
@@ -148,6 +162,7 @@ fun HiFiDisplayApp(
                         },
                         onSelectDesign = onSelectDesign,
                         onSelectPalette = onSelectPalette,
+                        onSelectArtworkMotion = onSelectArtworkMotion,
                         onShowDiagnostics = {
                             showSourcePicker = false
                             showDiagnostics = true
@@ -175,11 +190,21 @@ fun HiFiDisplayApp(
 
 @Composable
 private fun DisplayMenuButton(modifier: Modifier = Modifier, onClick: () -> Unit) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val pressed by interactionSource.collectIsPressedAsState()
+    val view = LocalView.current
     Row(
         modifier = modifier
             .clip(RoundedCornerShape(4.dp))
-            .background(SurfaceRaised.copy(alpha = .94f))
-            .clickable(onClick = onClick)
+            .background(if (pressed) Accent.copy(alpha = .14f) else SurfaceRaised.copy(alpha = .94f))
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null,
+                onClick = {
+                    view.performPremiumHaptic()
+                    onClick()
+                },
+            )
             .heightIn(min = 48.dp)
             .padding(horizontal = 12.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -260,6 +285,7 @@ private fun EmptySession() {
 private fun NowPlaying(
     state: MediaUiState,
     design: DisplayDesign,
+    artworkMotion: ArtworkMotion,
     onPlay: () -> Unit,
     onPause: () -> Unit,
     onPrevious: () -> Unit,
@@ -286,6 +312,7 @@ private fun NowPlaying(
         PlaybackSkinLayout(
             state = state,
             design = activeDesign,
+            artworkMotion = artworkMotion,
             burnInOffset = burnInOffset,
             controlsVisible = controlsVisible,
             onInteraction = onInteraction,
@@ -304,6 +331,7 @@ private fun NowPlaying(
 private fun PlaybackSkinLayout(
     state: MediaUiState,
     design: DisplayDesign,
+    artworkMotion: ArtworkMotion,
     burnInOffset: Pair<Int, Int>,
     controlsVisible: Boolean,
     onInteraction: () -> Unit,
@@ -318,6 +346,19 @@ private fun PlaybackSkinLayout(
     val tokens = design.tokens
     val artworkInteraction = remember { MutableInteractionSource() }
     val metadataInteraction = remember { MutableInteractionSource() }
+    val artworkPressed by artworkInteraction.collectIsPressedAsState()
+    val metadataPressed by metadataInteraction.collectIsPressedAsState()
+    val artworkScale by animateFloatAsState(
+        targetValue = if (artworkPressed) .988f else 1f,
+        animationSpec = tween(110),
+        label = "artwork touch",
+    )
+    val metadataAlpha by animateFloatAsState(
+        targetValue = if (metadataPressed) .82f else 1f,
+        animationSpec = tween(100),
+        label = "metadata touch",
+    )
+    val view = LocalView.current
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val layoutMode = resolveDisplayLayoutMode(maxWidth.value, maxHeight.value)
         val compact = layoutMode == DisplayLayoutMode.COMPACT
@@ -342,13 +383,19 @@ private fun PlaybackSkinLayout(
                 Artwork(
                     state = state,
                     design = design,
+                    motion = artworkMotion,
+                    pressed = artworkPressed,
                     modifier = Modifier
                         .fillMaxHeight()
                         .aspectRatio(1f)
+                        .graphicsLayer { scaleX = artworkScale; scaleY = artworkScale }
                         .clickable(
                             interactionSource = artworkInteraction,
                             indication = null,
-                            onClick = onInteraction,
+                            onClick = {
+                                view.performPremiumHaptic()
+                                onInteraction()
+                            },
                         ),
                 )
                 Spacer(Modifier.width(contentGap))
@@ -369,10 +416,14 @@ private fun PlaybackSkinLayout(
                 metadataModifier = Modifier
                     .weight(1f)
                     .fillMaxWidth()
+                    .graphicsLayer { alpha = metadataAlpha }
                     .clickable(
                         interactionSource = metadataInteraction,
                         indication = null,
-                        onClick = onInteraction,
+                        onClick = {
+                            view.performPremiumHaptic()
+                            onInteraction()
+                        },
                     ),
                 modifier = Modifier.weight(1f).fillMaxHeight(),
             )
@@ -381,13 +432,19 @@ private fun PlaybackSkinLayout(
                 Artwork(
                     state = state,
                     design = design,
+                    motion = artworkMotion,
+                    pressed = artworkPressed,
                     modifier = Modifier
                         .fillMaxHeight()
                         .aspectRatio(1f)
+                        .graphicsLayer { scaleX = artworkScale; scaleY = artworkScale }
                         .clickable(
                             interactionSource = artworkInteraction,
                             indication = null,
-                            onClick = onInteraction,
+                            onClick = {
+                                view.performPremiumHaptic()
+                                onInteraction()
+                            },
                         ),
                 )
             }
@@ -616,6 +673,7 @@ private fun SourceHeader(
     val shape = RoundedCornerShape(design.tokens.sourceCornerRadius)
     val interactionSource = remember { MutableInteractionSource() }
     val pressed by interactionSource.collectIsPressedAsState()
+    val view = LocalView.current
     val container by animateColorAsState(
         targetValue = when {
             pressed -> SurfaceRaised.copy(alpha = .8f)
@@ -630,13 +688,19 @@ private fun SourceHeader(
             .height(48.dp)
             .clip(shape)
             .background(container)
-            .border(1.dp, SecondaryText.copy(alpha = if (pressed) .3f else .12f), shape)
+            .border(1.dp, if (pressed) Accent.copy(alpha = .58f) else SecondaryText.copy(alpha = .12f), shape)
             .combinedClickable(
                 interactionSource = interactionSource,
                 indication = null,
                 role = Role.Button,
-                onClick = onShowSources,
-                onLongClick = onShowDiagnostics,
+                onClick = {
+                    view.performPremiumHaptic()
+                    onShowSources()
+                },
+                onLongClick = {
+                    view.performPremiumHaptic(strong = true)
+                    onShowDiagnostics()
+                },
                 onLongClickLabel = "Abrir diagnóstico",
             )
             .padding(horizontal = 12.dp),
@@ -671,6 +735,7 @@ private fun SourcePickerOverlay(
     onSelectSource: (String?) -> Unit,
     onSelectDesign: (DisplayDesign) -> Unit,
     onSelectPalette: (ColorPalette) -> Unit,
+    onSelectArtworkMotion: (ArtworkMotion) -> Unit,
     onShowDiagnostics: () -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -755,6 +820,18 @@ private fun SourcePickerOverlay(
                     )
                 }
                 Spacer(Modifier.height(16.dp))
+                Text("ARTWORK MOTION", color = SecondaryText, fontSize = 10.sp, fontFamily = FontFamily.Monospace, letterSpacing = 1.5.sp)
+                Spacer(Modifier.height(7.dp))
+                ArtworkMotion.entries.forEach { option ->
+                    PickerRow(
+                        title = option.displayName,
+                        subtitle = option.descriptor,
+                        selected = appearance.artworkMotion == option,
+                        selectedLabel = "ACTIVE",
+                        onClick = { onSelectArtworkMotion(option) },
+                    )
+                }
+                Spacer(Modifier.height(16.dp))
                 Text("TOOLS", color = SecondaryText, fontSize = 10.sp, fontFamily = FontFamily.Monospace, letterSpacing = 1.5.sp)
                 Spacer(Modifier.height(7.dp))
                 PickerRow(
@@ -801,10 +878,13 @@ private fun DesignPreviewCard(
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val pressed by interactionSource.collectIsPressedAsState()
+    val scale by animateFloatAsState(if (pressed) .987f else 1f, tween(90), label = "${design.displayName} touch")
+    val view = LocalView.current
     val shape = RoundedCornerShape(4.dp)
     Column(
         modifier
             .height(86.dp)
+            .graphicsLayer { scaleX = scale; scaleY = scale }
             .clip(shape)
             .background(
                 when {
@@ -818,7 +898,10 @@ private fun DesignPreviewCard(
                 interactionSource = interactionSource,
                 indication = null,
                 role = Role.Button,
-                onClick = onClick,
+                onClick = {
+                    view.performPremiumHaptic()
+                    onClick()
+                },
             )
             .padding(9.dp),
     ) {
@@ -882,13 +965,31 @@ private fun PalettePickerRow(
     onClick: () -> Unit,
 ) {
     val colors = palette.colors
+    val interactionSource = remember { MutableInteractionSource() }
+    val pressed by interactionSource.collectIsPressedAsState()
+    val scale by animateFloatAsState(if (pressed) .993f else 1f, tween(90), label = "${palette.displayName} touch")
+    val view = LocalView.current
     Row(
         Modifier
             .fillMaxWidth()
             .heightIn(min = 48.dp)
+            .graphicsLayer { scaleX = scale; scaleY = scale }
             .clip(RoundedCornerShape(4.dp))
-            .background(if (selected) Accent.copy(alpha = .1f) else Color.Transparent)
-            .clickable(onClick = onClick)
+            .background(
+                when {
+                    pressed -> SurfaceRaised.copy(alpha = .62f)
+                    selected -> Accent.copy(alpha = .1f)
+                    else -> Color.Transparent
+                },
+            )
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null,
+                onClick = {
+                    view.performPremiumHaptic()
+                    onClick()
+                },
+            )
             .padding(horizontal = 14.dp, vertical = 9.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -918,15 +1019,39 @@ private fun PickerRow(
     subtitle: String,
     selected: Boolean,
     enabled: Boolean = true,
+    selectedLabel: String = "SELECTED",
     onClick: () -> Unit,
 ) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val pressed by interactionSource.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (pressed && enabled) .993f else 1f,
+        animationSpec = tween(90),
+        label = "$title touch",
+    )
+    val view = LocalView.current
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .heightIn(min = 48.dp)
+            .graphicsLayer { scaleX = scale; scaleY = scale }
             .clip(RoundedCornerShape(4.dp))
-            .background(if (selected) Accent.copy(alpha = .12f) else Color.Transparent)
-            .clickable(enabled = enabled, onClick = onClick)
+            .background(
+                when {
+                    pressed && enabled -> SurfaceRaised.copy(alpha = .62f)
+                    selected -> Accent.copy(alpha = .12f)
+                    else -> Color.Transparent
+                },
+            )
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null,
+                enabled = enabled,
+                onClick = {
+                    view.performPremiumHaptic()
+                    onClick()
+                },
+            )
             .padding(horizontal = 14.dp, vertical = 9.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -941,7 +1066,7 @@ private fun PickerRow(
             Text(title, color = PrimaryText.copy(alpha = if (enabled) 1f else .45f), fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(subtitle, color = SecondaryText.copy(alpha = if (enabled) 1f else .45f), fontSize = 9.sp, fontFamily = FontFamily.Monospace, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
-        if (selected) Text("SELECTED", color = Accent, fontSize = 9.sp, fontFamily = FontFamily.Monospace)
+        if (selected) Text(selectedLabel, color = Accent, fontSize = 9.sp, fontFamily = FontFamily.Monospace)
     }
 }
 
@@ -1013,36 +1138,61 @@ private fun Boolean.availableLabel() = if (this) "AVAILABLE" else "MISSING"
 private fun Artwork(
     state: MediaUiState,
     design: DisplayDesign,
+    motion: ArtworkMotion,
+    pressed: Boolean,
     modifier: Modifier,
 ) {
     when (design.tokens.artworkTreatment) {
-        ArtworkTreatment.REFERENCE -> ReferenceArtwork(state, design, modifier)
-        ArtworkTreatment.STUDIO_DECK -> StudioArtworkDeck(state, design, modifier)
+        ArtworkTreatment.REFERENCE -> ReferenceArtwork(state, design, motion, pressed, modifier)
+        ArtworkTreatment.STUDIO_DECK -> StudioArtworkDeck(state, design, motion, pressed, modifier)
     }
 }
 
 @Composable
-private fun ReferenceArtwork(state: MediaUiState, design: DisplayDesign, modifier: Modifier) {
+private fun ReferenceArtwork(
+    state: MediaUiState,
+    design: DisplayDesign,
+    motion: ArtworkMotion,
+    pressed: Boolean,
+    modifier: Modifier,
+) {
     val frameShape = RoundedCornerShape(design.tokens.artworkCornerRadius)
+    val frameColor by animateColorAsState(
+        targetValue = if (pressed) Accent.copy(alpha = .52f) else SecondaryText.copy(alpha = .12f),
+        animationSpec = tween(110),
+        label = "artwork frame touch",
+    )
     Box(
         modifier
             .clip(frameShape)
             .background(Brush.linearGradient(listOf(SurfaceRaised, Surface)))
-            .border(1.dp, SecondaryText.copy(alpha = .12f), frameShape),
+            .border(1.dp, frameColor, frameShape),
         contentAlignment = Alignment.Center,
     ) {
-        ArtworkVisual(state)
+        ArtworkVisual(state, motion)
+        if (pressed) Box(Modifier.fillMaxSize().background(Accent.copy(alpha = .025f)))
     }
 }
 
 @Composable
-private fun StudioArtworkDeck(state: MediaUiState, design: DisplayDesign, modifier: Modifier) {
+private fun StudioArtworkDeck(
+    state: MediaUiState,
+    design: DisplayDesign,
+    motion: ArtworkMotion,
+    pressed: Boolean,
+    modifier: Modifier,
+) {
     val shape = RoundedCornerShape(design.tokens.artworkCornerRadius)
+    val frameColor by animateColorAsState(
+        targetValue = if (pressed) Accent.copy(alpha = .58f) else SecondaryText.copy(alpha = .2f),
+        animationSpec = tween(110),
+        label = "studio artwork touch",
+    )
     Column(
         modifier
             .clip(shape)
             .background(Surface.copy(alpha = .94f))
-            .border(1.dp, SecondaryText.copy(alpha = .2f), shape)
+            .border(1.dp, frameColor, shape)
             .padding(12.dp),
     ) {
         Row(Modifier.fillMaxWidth().height(18.dp), verticalAlignment = Alignment.Top) {
@@ -1063,7 +1213,8 @@ private fun StudioArtworkDeck(state: MediaUiState, design: DisplayDesign, modifi
                 .clip(RoundedCornerShape(1.dp))
                 .background(SurfaceRaised),
         ) {
-            ArtworkVisual(state)
+            ArtworkVisual(state, motion)
+            if (pressed) Box(Modifier.fillMaxSize().background(Accent.copy(alpha = .025f)))
         }
         Row(Modifier.fillMaxWidth().height(24.dp), verticalAlignment = Alignment.Bottom) {
             Box(Modifier.size(5.dp).clip(CircleShape).background(if (state.isPlaying) Accent else SecondaryText.copy(alpha = .35f)))
@@ -1083,23 +1234,68 @@ private fun StudioArtworkDeck(state: MediaUiState, design: DisplayDesign, modifi
     }
 }
 
+private data class ArtworkFrame(
+    val transitionKey: String,
+    val artwork: Bitmap?,
+    val title: String?,
+    val sourceApp: String?,
+)
+
 @Composable
-private fun ArtworkVisual(state: MediaUiState) {
-    Crossfade(
-        targetState = state.artwork,
-        animationSpec = tween(480),
-        label = "album artwork",
-    ) { artwork ->
-        if (artwork != null) {
-            Image(
-                bitmap = artwork.asImageBitmap(),
-                contentDescription = state.title?.let { "Carátula de $it" },
-                modifier = Modifier.fillMaxSize(),
-                contentScale = ContentScale.Crop,
-            )
-        } else {
-            ArtworkFallback(state.sourceApp)
-        }
+private fun ArtworkVisual(state: MediaUiState, motion: ArtworkMotion) {
+    val transitionKey = remember(
+        state.selectedSourcePackage,
+        state.title,
+        state.artist,
+        state.album,
+        state.durationMs,
+        state.artwork != null,
+    ) {
+        buildArtworkTransitionKey(
+            sourcePackage = state.selectedSourcePackage,
+            title = state.title,
+            artist = state.artist,
+            album = state.album,
+            durationMs = state.durationMs,
+            hasArtwork = state.artwork != null,
+        )
+    }
+    val frame = remember(transitionKey) {
+        ArtworkFrame(transitionKey, state.artwork, state.title, state.sourceApp)
+    }
+    when (motion) {
+        ArtworkMotion.FOCUS -> AnimatedContent(
+            targetState = frame,
+            transitionSpec = {
+                (fadeIn(tween(durationMillis = 360, delayMillis = 40)) +
+                    scaleIn(tween(durationMillis = 520), initialScale = .985f))
+                    .togetherWith(fadeOut(tween(durationMillis = 180)))
+            },
+            label = "artwork focus",
+        ) { ArtworkFrameContent(it) }
+
+        ArtworkMotion.DISSOLVE -> Crossfade(
+            targetState = frame,
+            animationSpec = tween(360),
+            label = "artwork dissolve",
+        ) { ArtworkFrameContent(it) }
+
+        ArtworkMotion.DIRECT -> ArtworkFrameContent(frame)
+    }
+}
+
+@Composable
+private fun ArtworkFrameContent(frame: ArtworkFrame) {
+    val artwork = frame.artwork
+    if (artwork != null) {
+        Image(
+            bitmap = artwork.asImageBitmap(),
+            contentDescription = frame.title?.let { "Carátula de $it" },
+            modifier = Modifier.fillMaxSize(),
+            contentScale = ContentScale.Crop,
+        )
+    } else {
+        ArtworkFallback(frame.sourceApp)
     }
 }
 
@@ -1201,6 +1397,7 @@ private fun ControlButton(
     val shape = if (console) RoundedCornerShape(4.dp) else CircleShape
     val interactionSource = remember { MutableInteractionSource() }
     val pressed by interactionSource.collectIsPressedAsState()
+    val view = LocalView.current
     val scale by animateFloatAsState(
         targetValue = if (pressed) .93f else 1f,
         animationSpec = tween(100),
@@ -1239,7 +1436,10 @@ private fun ControlButton(
                 interactionSource = interactionSource,
                 indication = null,
                 role = Role.Button,
-                onClick = action,
+                onClick = {
+                    view.performPremiumHaptic(strong = primary)
+                    action()
+                },
             ),
         contentAlignment = Alignment.Center,
     ) {
@@ -1260,6 +1460,7 @@ private fun Progress(
     onInteraction: () -> Unit,
     onSeek: (Long) -> Unit,
 ) {
+    val view = LocalView.current
     val duration = state.durationMs
     var dragValue by remember { mutableStateOf<Float?>(null) }
     val progress = dragValue ?: if (duration != null && duration > 0) state.positionMs.toFloat() / duration else 0f
@@ -1282,6 +1483,7 @@ private fun Progress(
                 val value = dragValue
                 if (value != null && duration != null) onSeek((value * duration).roundToLong())
                 dragValue = null
+                view.performPremiumHaptic()
                 onInteraction()
             },
             onSetProgress = { value ->
@@ -1414,4 +1616,13 @@ private val BURN_IN_OFFSETS = listOf(0 to 0, 1 to -1, -1 to 1, 1 to 1)
 private fun formatTime(milliseconds: Long): String {
     val seconds = milliseconds.coerceAtLeast(0L) / 1_000L
     return "%d:%02d".format(seconds / 60L, seconds % 60L)
+}
+
+private fun View.performPremiumHaptic(strong: Boolean = false) {
+    val feedback = when {
+        strong -> HapticFeedbackConstants.LONG_PRESS
+        Build.VERSION.SDK_INT >= Build.VERSION_CODES.R -> HapticFeedbackConstants.CONFIRM
+        else -> HapticFeedbackConstants.CONTEXT_CLICK
+    }
+    performHapticFeedback(feedback)
 }

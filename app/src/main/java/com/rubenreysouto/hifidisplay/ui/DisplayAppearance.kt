@@ -35,9 +35,37 @@ enum class ColorPalette(val storageKey: String, val displayName: String) {
     }
 }
 
+enum class ArtworkMotion(
+    val storageKey: String,
+    val displayName: String,
+    val descriptor: String,
+) {
+    FOCUS(
+        storageKey = "focus",
+        displayName = "Focus",
+        descriptor = "SUBTLE DEPTH · CALM ARRIVAL",
+    ),
+    DISSOLVE(
+        storageKey = "dissolve",
+        displayName = "Dissolve",
+        descriptor = "CLEAN CROSSFADE · NO SCALE",
+    ),
+    DIRECT(
+        storageKey = "direct",
+        displayName = "Direct",
+        descriptor = "INSTANT · NO ANIMATION",
+    );
+
+    companion object {
+        fun fromStorage(value: String?): ArtworkMotion =
+            entries.firstOrNull { it.storageKey == value } ?: FOCUS
+    }
+}
+
 data class DisplayAppearance(
     val design: DisplayDesign = DisplayDesign.MODERN_REFERENCE,
     val palette: ColorPalette = ColorPalette.HIFI_GREEN,
+    val artworkMotion: ArtworkMotion = ArtworkMotion.FOCUS,
 )
 
 @Immutable

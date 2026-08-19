@@ -75,3 +75,19 @@ internal fun resolveDisplayLayoutMode(widthDp: Float, heightDp: Float): DisplayL
     widthDp >= 1_000f && heightDp >= 420f -> DisplayLayoutMode.WIDE
     else -> DisplayLayoutMode.STANDARD
 }
+
+internal fun buildArtworkTransitionKey(
+    sourcePackage: String?,
+    title: String?,
+    artist: String?,
+    album: String?,
+    durationMs: Long?,
+    hasArtwork: Boolean,
+): String = listOf(
+    sourcePackage,
+    title,
+    artist,
+    album,
+    durationMs?.toString(),
+    if (hasArtwork) "art" else "fallback",
+).joinToString(separator = "|") { it.orEmpty() }

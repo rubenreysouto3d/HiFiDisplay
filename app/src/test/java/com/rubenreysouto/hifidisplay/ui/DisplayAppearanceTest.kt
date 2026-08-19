@@ -16,9 +16,16 @@ class DisplayAppearanceTest {
     }
 
     @Test
+    fun `stored artwork motion is restored independently`() {
+        assertEquals(ArtworkMotion.DISSOLVE, ArtworkMotion.fromStorage("dissolve"))
+        assertEquals(ArtworkMotion.DIRECT, ArtworkMotion.fromStorage("direct"))
+    }
+
+    @Test
     fun `unknown appearance values use safe defaults`() {
         assertEquals(ColorPalette.HIFI_GREEN, ColorPalette.fromStorage("future-palette"))
         assertEquals(DisplayDesign.MODERN_REFERENCE, DisplayDesign.fromStorage("future-design"))
+        assertEquals(ArtworkMotion.FOCUS, ArtworkMotion.fromStorage("future-motion"))
     }
 
     @Test
@@ -28,6 +35,19 @@ class DisplayAppearanceTest {
 
         assertEquals(original.design, recolored.design)
         assertNotEquals(original.palette, recolored.palette)
+    }
+
+    @Test
+    fun `artwork motion changes independently from design and palette`() {
+        val original = DisplayAppearance(
+            design = DisplayDesign.STUDIO_LEDGER,
+            palette = ColorPalette.WARM_AMBER,
+        )
+        val direct = original.copy(artworkMotion = ArtworkMotion.DIRECT)
+
+        assertEquals(original.design, direct.design)
+        assertEquals(original.palette, direct.palette)
+        assertNotEquals(original.artworkMotion, direct.artworkMotion)
     }
 
     @Test
@@ -56,5 +76,23 @@ class DisplayAppearanceTest {
     fun `layout resolver distinguishes standard and wide displays`() {
         assertEquals(DisplayLayoutMode.STANDARD, resolveDisplayLayoutMode(widthDp = 900f, heightDp = 400f))
         assertEquals(DisplayLayoutMode.WIDE, resolveDisplayLayoutMode(widthDp = 1_100f, heightDp = 500f))
+    }
+
+
+    @Test
+    fun `artwork transition identity is stable across bitmap refreshes`() {
+        val first = buildArtworkTransitionKey("music.app", "Track", "Artist", "Album", 180_000L, true)
+        val refreshed = buildArtworkTransitionKey("music.app", "Track", "Artist", "Album", 180_000L, true)
+
+        assertEquals(first, refreshed)
+    }
+
+    @Test
+    fun `artwork transition identity changes for meaningful display changes`() {
+        val base = buildArtworkTransitionKey("music.app", "Track A", "Artist", "Album", 180_000L, true)
+
+        assertNotEquals(base, buildArtworkTransitionKey("music.app", "Track B", "Artist", "Album", 180_000L, true))
+        assertNotEquals(base, buildArtworkTransitionKey("other.app", "Track A", "Artist", "Album", 180_000L, true))
+        assertNotEquals(base, buildArtworkTransitionKey("music.app", "Track A", "Artist", "Album", 180_000L, false))
     }
 }
