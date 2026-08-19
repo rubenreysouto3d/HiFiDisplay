@@ -51,6 +51,7 @@ fun HiFiDisplayApp(
     onSelectSkin: (DisplaySkin) -> Unit,
 ) {
     val palette = skin.palette
+    var showSourcePicker by remember { mutableStateOf(false) }
     MaterialTheme(
         colorScheme = darkColorScheme(
             background = palette.background,
@@ -64,23 +65,61 @@ fun HiFiDisplayApp(
         ),
     ) {
         Surface(modifier = Modifier.fillMaxSize(), color = Background) {
-            when (state.availability) {
-                SessionAvailability.PERMISSION_REQUIRED -> AccessRequired(onOpenAccessSettings)
-                SessionAvailability.NO_SESSION -> EmptySession()
-                SessionAvailability.ERROR -> SessionError()
-                SessionAvailability.ACTIVE -> NowPlaying(
-                    state = state,
-                    skin = skin,
-                    onPlay = onPlay,
-                    onPause = onPause,
-                    onPrevious = onPrevious,
-                    onNext = onNext,
-                    onSeek = onSeek,
-                    onSelectSource = onSelectSource,
-                    onSelectSkin = onSelectSkin,
+            Box(Modifier.fillMaxSize()) {
+                when (state.availability) {
+                    SessionAvailability.PERMISSION_REQUIRED -> AccessRequired(onOpenAccessSettings)
+                    SessionAvailability.NO_SESSION -> EmptySession()
+                    SessionAvailability.ERROR -> SessionError()
+                    SessionAvailability.ACTIVE -> NowPlaying(
+                        state = state,
+                        onPlay = onPlay,
+                        onPause = onPause,
+                        onPrevious = onPrevious,
+                        onNext = onNext,
+                        onSeek = onSeek,
+                        onShowSources = { showSourcePicker = true },
+                    )
+                }
+                DisplayMenuButton(
+                    modifier = Modifier.align(Alignment.TopEnd).padding(top = 18.dp, end = 22.dp),
+                    onClick = { showSourcePicker = true },
                 )
+                if (showSourcePicker) {
+                    SourcePickerOverlay(
+                        state = state,
+                        skin = skin,
+                        onSelectSource = {
+                            onSelectSource(it)
+                            showSourcePicker = false
+                        },
+                        onSelectSkin = onSelectSkin,
+                        onDismiss = { showSourcePicker = false },
+                    )
+                }
             }
         }
+    }
+}
+
+@Composable
+private fun DisplayMenuButton(modifier: Modifier = Modifier, onClick: () -> Unit) {
+    Row(
+        modifier = modifier
+            .clip(RoundedCornerShape(4.dp))
+            .background(SurfaceRaised.copy(alpha = .94f))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(Icons.Rounded.Tune, null, tint = Accent, modifier = Modifier.size(16.dp))
+        Spacer(Modifier.width(8.dp))
+        Text(
+            "SOURCE / SKIN",
+            color = PrimaryText,
+            fontSize = 10.sp,
+            fontFamily = FontFamily.Monospace,
+            letterSpacing = 1.2.sp,
+        )
     }
 }
 
@@ -147,24 +186,21 @@ private fun EmptySession() {
 @Composable
 private fun NowPlaying(
     state: MediaUiState,
-    skin: DisplaySkin,
     onPlay: () -> Unit,
     onPause: () -> Unit,
     onPrevious: () -> Unit,
     onNext: () -> Unit,
     onSeek: (Long) -> Unit,
-    onSelectSource: (String?) -> Unit,
-    onSelectSkin: (DisplaySkin) -> Unit,
+    onShowSources: () -> Unit,
 ) {
     var showDiagnostics by remember { mutableStateOf(false) }
-    var showSourcePicker by remember { mutableStateOf(false) }
     Box(Modifier.fillMaxSize()) {
         Row(Modifier.fillMaxSize().padding(horizontal = 36.dp, vertical = 28.dp), horizontalArrangement = Arrangement.spacedBy(40.dp)) {
             Artwork(state, Modifier.fillMaxHeight().aspectRatio(1f))
             Column(Modifier.weight(1f).fillMaxHeight()) {
                 SourceHeader(
                     state = state,
-                    onShowSources = { showSourcePicker = true },
+                    onShowSources = onShowSources,
                     onShowDiagnostics = { showDiagnostics = true },
                 )
                 Spacer(Modifier.weight(0.7f))
@@ -181,18 +217,6 @@ private fun NowPlaying(
             }
         }
         if (showDiagnostics) DiagnosticsOverlay(state, onDismiss = { showDiagnostics = false })
-        if (showSourcePicker) {
-            SourcePickerOverlay(
-                state = state,
-                skin = skin,
-                onSelectSource = {
-                    onSelectSource(it)
-                    showSourcePicker = false
-                },
-                onSelectSkin = onSelectSkin,
-                onDismiss = { showSourcePicker = false },
-            )
-        }
     }
 }
 
