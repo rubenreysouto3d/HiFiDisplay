@@ -2,6 +2,8 @@ package com.rubenreysouto.hifidisplay.ui
 
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
+import com.rubenreysouto.hifidisplay.preferences.migratePaletteFamily
+import com.rubenreysouto.hifidisplay.preferences.migratePaletteMode
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
@@ -34,6 +36,7 @@ class DisplayAppearanceTest {
         assertEquals(DisplayDesign.MODERN_REFERENCE, DisplayDesign.fromStorage("future-design"))
         assertEquals(ArtworkMotion.FOCUS, ArtworkMotion.fromStorage("future-motion"))
         assertEquals(PlaybackArtworkEffect.PULSE, PlaybackArtworkEffect.fromStorage("future-effect"))
+        assertEquals(PaletteMode.DARK, PaletteMode.fromStorage("future-mode"))
     }
 
     @Test
@@ -67,38 +70,63 @@ class DisplayAppearanceTest {
 
     @Test
     fun `each palette has a distinct accent`() {
-        val accents = ColorPalette.entries.map { it.colors.accent }
+        val accents = ColorPalette.entries.map { it.colors(PaletteMode.DARK).accent }
         assertEquals(ColorPalette.entries.size, accents.distinct().size)
-        assertNotEquals(ColorPalette.HIFI_GREEN.colors.accent, ColorPalette.WARM_AMBER.colors.accent)
+        assertNotEquals(
+            ColorPalette.HIFI_GREEN.colors(PaletteMode.DARK).accent,
+            ColorPalette.WARM_AMBER.colors(PaletteMode.DARK).accent,
+        )
     }
 
     @Test
     fun `new palettes restore from stable storage keys`() {
-        assertEquals(ColorPalette.OLED_ABSOLUTE, ColorPalette.fromStorage("oled-absolute"))
         assertEquals(ColorPalette.ARCTIC_SILVER, ColorPalette.fromStorage("arctic-silver"))
-        assertEquals(ColorPalette.CHAMPAGNE_FROST, ColorPalette.fromStorage("champagne-frost"))
         assertEquals(ColorPalette.COBALT_NIGHT, ColorPalette.fromStorage("cobalt-night"))
         assertEquals(ColorPalette.VELVET_VIOLET, ColorPalette.fromStorage("velvet-violet"))
         assertEquals(ColorPalette.RUBY_SIGNAL, ColorPalette.fromStorage("ruby-signal"))
     }
 
     @Test
-    fun `oled palette uses a fully opaque absolute black background`() {
-        val oled = ColorPalette.OLED_ABSOLUTE.colors
-
-        assertTrue(ColorPalette.OLED_ABSOLUTE.isOled)
-        assertEquals(Color.Black, oled.background)
-        assertEquals(1f, oled.background.alpha)
+    fun `legacy combined palettes migrate to family and light level`() {
+        assertEquals(ColorPalette.WARM_AMBER.storageKey, migratePaletteFamily("champagne-frost"))
+        assertEquals(PaletteMode.LIGHT, migratePaletteMode("champagne-frost"))
+        assertEquals(ColorPalette.HIFI_GREEN.storageKey, migratePaletteFamily("oled-absolute"))
+        assertEquals(PaletteMode.OLED, migratePaletteMode("oled-absolute"))
+        assertEquals(ColorPalette.ARCTIC_SILVER.storageKey, migratePaletteFamily("arctic-silver"))
+        assertEquals(PaletteMode.LIGHT, migratePaletteMode("arctic-silver"))
     }
 
     @Test
-    fun `light palettes use dark text over genuinely light surfaces`() {
-        listOf(ColorPalette.ARCTIC_SILVER, ColorPalette.CHAMPAGNE_FROST).forEach { palette ->
-            val colors = palette.colors
-            assertTrue(palette.isLight)
+    fun `oled mode gives every family a fully opaque absolute black background`() {
+        ColorPalette.entries.forEach { palette ->
+            val oled = palette.colors(PaletteMode.OLED)
+
+            assertEquals(Color.Black, oled.background)
+            assertEquals(1f, oled.background.alpha)
+        }
+    }
+
+    @Test
+    fun `light mode gives every family dark text over genuinely light surfaces`() {
+        ColorPalette.entries.forEach { palette ->
+            val colors = palette.colors(PaletteMode.LIGHT)
             assertTrue(colors.background.luminance() > colors.primaryText.luminance())
             assertTrue(colors.surfaceRaised.luminance() > colors.secondaryText.luminance())
         }
+    }
+
+    @Test
+    fun `light level changes independently from color family and design`() {
+        val original = DisplayAppearance(
+            design = DisplayDesign.CRYSTAL_ATRIUM,
+            palette = ColorPalette.VELVET_VIOLET,
+            paletteMode = PaletteMode.DARK,
+        )
+        val light = original.copy(paletteMode = PaletteMode.LIGHT)
+
+        assertEquals(original.design, light.design)
+        assertEquals(original.palette, light.palette)
+        assertNotEquals(original.paletteMode, light.paletteMode)
     }
 
     @Test

@@ -37,18 +37,18 @@ class DisplayMotionEngineTest {
     }
 
     @Test
-    fun `pulse phase stays locked to playback position`() {
+    fun `ambient breathe phase stays locked to playback position`() {
         assertEquals(0f, resolvePlaybackEffectPhase(PlaybackArtworkEffect.PULSE, 0L))
-        assertEquals(1f, resolvePlaybackEffectPhase(PlaybackArtworkEffect.PULSE, 326L))
-        assertEquals(0f, resolvePlaybackEffectPhase(PlaybackArtworkEffect.PULSE, 652L))
-        assertEquals(.5f, resolvePlaybackEffectPhase(PlaybackArtworkEffect.PULSE, 815L))
+        assertEquals(1f, resolvePlaybackEffectPhase(PlaybackArtworkEffect.PULSE, 1_800L))
+        assertEquals(0f, resolvePlaybackEffectPhase(PlaybackArtworkEffect.PULSE, 3_600L))
+        assertEquals(.5f, resolvePlaybackEffectPhase(PlaybackArtworkEffect.PULSE, 4_500L))
     }
 
     @Test
     fun `all continuous effects repeat from deterministic playback anchors`() {
         val cycleLengths = mapOf(
-            PlaybackArtworkEffect.PULSE to 652L,
-            PlaybackArtworkEffect.HALO to 1_304L,
+            PlaybackArtworkEffect.PULSE to 3_600L,
+            PlaybackArtworkEffect.HALO to 4_800L,
             PlaybackArtworkEffect.DRIFT to 10_432L,
         )
 

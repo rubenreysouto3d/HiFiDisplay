@@ -44,21 +44,32 @@ enum class ColorPalette(
     val storageKey: String,
     val displayName: String,
     val descriptor: String,
-    val isLight: Boolean = false,
-    val isOled: Boolean = false,
 ) {
-    HIFI_GREEN("green", "Hi-Fi Green", "DARK · SIGNATURE GREEN"),
-    WARM_AMBER("amber", "Warm Amber", "DARK · VALVE WARMTH"),
-    OLED_ABSOLUTE("oled-absolute", "OLED Absolute", "TRUE BLACK · PIXELS OFF", isOled = true),
-    ARCTIC_SILVER("arctic-silver", "Arctic Silver", "LIGHT · COOL GLASS", isLight = true),
-    CHAMPAGNE_FROST("champagne-frost", "Champagne Frost", "LIGHT · WARM GLASS", isLight = true),
-    COBALT_NIGHT("cobalt-night", "Cobalt Night", "DARK · COBALT BLUE"),
-    VELVET_VIOLET("velvet-violet", "Velvet Violet", "DARK · SOFT VIOLET"),
-    RUBY_SIGNAL("ruby-signal", "Ruby Signal", "DARK · SIGNAL RED");
+    HIFI_GREEN("green", "Reference Green", "SIGNATURE · FRESH"),
+    WARM_AMBER("amber", "Valve Amber", "WARM · ANALOG"),
+    ARCTIC_SILVER("arctic-silver", "Arctic Cyan", "COOL · PRECISE"),
+    COBALT_NIGHT("cobalt-night", "Cobalt", "DEEP · ELECTRIC"),
+    VELVET_VIOLET("velvet-violet", "Velvet", "SOFT · VIOLET"),
+    RUBY_SIGNAL("ruby-signal", "Ruby", "FOCUSED · SIGNAL");
 
     companion object {
         fun fromStorage(value: String?): ColorPalette =
             entries.firstOrNull { it.storageKey == value } ?: HIFI_GREEN
+    }
+}
+
+enum class PaletteMode(
+    val storageKey: String,
+    val displayName: String,
+    val descriptor: String,
+) {
+    DARK("dark", "Dark", "LOW LIGHT"),
+    LIGHT("light", "Light", "CLEAR FIELD"),
+    OLED("oled", "OLED", "TRUE BLACK");
+
+    companion object {
+        fun fromStorage(value: String?): PaletteMode =
+            entries.firstOrNull { it.storageKey == value } ?: DARK
     }
 }
 
@@ -101,18 +112,18 @@ enum class PlaybackArtworkEffect(
 ) {
     PULSE(
         storageKey = "pulse",
-        displayName = "Pulse",
-        descriptor = "POSITION LOCK · 92 BPM BASE",
+        displayName = "Breathe",
+        descriptor = "GENTLE SCALE · VISUAL ONLY",
     ),
     DRIFT(
         storageKey = "drift",
-        displayName = "Drift",
-        descriptor = "16-BEAT DEPTH · SLOW MOTION",
+        displayName = "Float",
+        descriptor = "SLOW DEPTH · VISUAL ONLY",
     ),
     HALO(
         storageKey = "halo",
-        displayName = "Halo",
-        descriptor = "2-BEAT LIGHT · STABLE COVER",
+        displayName = "Glow",
+        descriptor = "EDGE LIGHT · STABLE COVER",
     ),
     STILL(
         storageKey = "still",
@@ -129,6 +140,7 @@ enum class PlaybackArtworkEffect(
 data class DisplayAppearance(
     val design: DisplayDesign = DisplayDesign.MODERN_REFERENCE,
     val palette: ColorPalette = ColorPalette.HIFI_GREEN,
+    val paletteMode: PaletteMode = PaletteMode.DARK,
     val artworkMotion: ArtworkMotion = ArtworkMotion.FOCUS,
     val playbackArtworkEffect: PlaybackArtworkEffect = PlaybackArtworkEffect.PULSE,
 )
@@ -144,8 +156,8 @@ internal data class DisplayColors(
     val accentContent: Color,
 )
 
-internal val ColorPalette.colors: DisplayColors
-    get() = when (this) {
+internal fun ColorPalette.colors(mode: PaletteMode): DisplayColors = when (mode) {
+    PaletteMode.DARK -> when (this) {
         ColorPalette.HIFI_GREEN -> DisplayColors(
             background = Color(0xFF090B0D),
             surface = Color(0xFF111519),
@@ -164,32 +176,14 @@ internal val ColorPalette.colors: DisplayColors
             accent = Color(0xFFFFBC57),
             accentContent = Color(0xFF211305),
         )
-        ColorPalette.OLED_ABSOLUTE -> DisplayColors(
-            background = Color.Black,
-            surface = Color(0xFF050605),
-            surfaceRaised = Color(0xFF131613),
-            primaryText = Color(0xFFE9EEE9),
-            secondaryText = Color(0xFF747B75),
-            accent = Color(0xFFC7FF77),
-            accentContent = Color.Black,
-        )
         ColorPalette.ARCTIC_SILVER -> DisplayColors(
-            background = Color(0xFFE8EEF1),
-            surface = Color(0xFFDCE5E9),
-            surfaceRaised = Color(0xFFF6F9FA),
-            primaryText = Color(0xFF17232A),
-            secondaryText = Color(0xFF53656F),
-            accent = Color(0xFF246984),
-            accentContent = Color(0xFFF5FAFC),
-        )
-        ColorPalette.CHAMPAGNE_FROST -> DisplayColors(
-            background = Color(0xFFEAE3D8),
-            surface = Color(0xFFDDD2C2),
-            surfaceRaised = Color(0xFFF8F2E9),
-            primaryText = Color(0xFF2B241D),
-            secondaryText = Color(0xFF6E6153),
-            accent = Color(0xFF956326),
-            accentContent = Color(0xFFFFF8ED),
+            background = Color(0xFF071014),
+            surface = Color(0xFF0D1A20),
+            surfaceRaised = Color(0xFF17303A),
+            primaryText = Color(0xFFEFF9FB),
+            secondaryText = Color(0xFF87A8B0),
+            accent = Color(0xFF70D7E8),
+            accentContent = Color(0xFF041B20),
         )
         ColorPalette.COBALT_NIGHT -> DisplayColors(
             background = Color(0xFF070A12),
@@ -219,3 +213,50 @@ internal val ColorPalette.colors: DisplayColors
             accentContent = Color(0xFF29090E),
         )
     }
+
+    PaletteMode.LIGHT -> when (this) {
+        ColorPalette.HIFI_GREEN -> DisplayColors(
+            background = Color(0xFFE8EDE4), surface = Color(0xFFDCE4D6), surfaceRaised = Color(0xFFF5F8F2),
+            primaryText = Color(0xFF182017), secondaryText = Color(0xFF596857), accent = Color(0xFF4D741B), accentContent = Color(0xFFF7FBEF),
+        )
+        ColorPalette.WARM_AMBER -> DisplayColors(
+            background = Color(0xFFECE4D8), surface = Color(0xFFE0D3C1), surfaceRaised = Color(0xFFFAF4EA),
+            primaryText = Color(0xFF2B241D), secondaryText = Color(0xFF706151), accent = Color(0xFF956326), accentContent = Color(0xFFFFF8ED),
+        )
+        ColorPalette.ARCTIC_SILVER -> DisplayColors(
+            background = Color(0xFFE5EEF1), surface = Color(0xFFD6E4E8), surfaceRaised = Color(0xFFF4F9FA),
+            primaryText = Color(0xFF15252B), secondaryText = Color(0xFF506A72), accent = Color(0xFF19748A), accentContent = Color(0xFFF1FBFD),
+        )
+        ColorPalette.COBALT_NIGHT -> DisplayColors(
+            background = Color(0xFFE5EAF3), surface = Color(0xFFD7DFEC), surfaceRaised = Color(0xFFF5F7FC),
+            primaryText = Color(0xFF182235), secondaryText = Color(0xFF586981), accent = Color(0xFF315F9E), accentContent = Color(0xFFF5F8FF),
+        )
+        ColorPalette.VELVET_VIOLET -> DisplayColors(
+            background = Color(0xFFECE6EF), surface = Color(0xFFDFD5E4), surfaceRaised = Color(0xFFFAF6FB),
+            primaryText = Color(0xFF2A2030), secondaryText = Color(0xFF71627A), accent = Color(0xFF805096), accentContent = Color(0xFFFFF8FF),
+        )
+        ColorPalette.RUBY_SIGNAL -> DisplayColors(
+            background = Color(0xFFF0E5E7), surface = Color(0xFFE5D4D8), surfaceRaised = Color(0xFFFFF7F8),
+            primaryText = Color(0xFF301E22), secondaryText = Color(0xFF7A5E65), accent = Color(0xFFA13D51), accentContent = Color(0xFFFFF7F8),
+        )
+    }
+
+    PaletteMode.OLED -> when (this) {
+        ColorPalette.HIFI_GREEN -> oledColors(Color(0xFFC7FF77), Color(0xFF101607))
+        ColorPalette.WARM_AMBER -> oledColors(Color(0xFFFFBC57), Color(0xFF211305))
+        ColorPalette.ARCTIC_SILVER -> oledColors(Color(0xFF70D7E8), Color(0xFF041B20))
+        ColorPalette.COBALT_NIGHT -> oledColors(Color(0xFF75B9FF), Color(0xFF07182B))
+        ColorPalette.VELVET_VIOLET -> oledColors(Color(0xFFD8A5F4), Color(0xFF211126))
+        ColorPalette.RUBY_SIGNAL -> oledColors(Color(0xFFFF7F91), Color(0xFF29090E))
+    }
+}
+
+private fun oledColors(accent: Color, accentContent: Color) = DisplayColors(
+    background = Color.Black,
+    surface = Color(0xFF040504),
+    surfaceRaised = Color(0xFF111411),
+    primaryText = Color(0xFFE9EEE9),
+    secondaryText = Color(0xFF747B75),
+    accent = accent,
+    accentContent = accentContent,
+)

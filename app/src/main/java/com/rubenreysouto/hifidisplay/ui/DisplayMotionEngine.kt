@@ -44,8 +44,8 @@ internal fun resolvePlaybackEffectPhase(
     positionMs: Long,
 ): Float {
     val halfCycleMs = when (effect) {
-        PlaybackArtworkEffect.PULSE -> 326L
-        PlaybackArtworkEffect.HALO -> 652L
+        PlaybackArtworkEffect.PULSE -> 1_800L
+        PlaybackArtworkEffect.HALO -> 2_400L
         PlaybackArtworkEffect.DRIFT -> 5_216L
         PlaybackArtworkEffect.STILL -> return 0f
     }
