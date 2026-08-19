@@ -41,4 +41,4 @@ Suggested device compatibility pass:
 
 ## v0.5 sources and skins
 
-Use the always-visible `SOURCE / SKIN` button to choose automatic session following or pin a specific active media app, even when no session is playing. The same panel switches between the original Hi-Fi Green skin and Warm Amber; both choices persist across launches. Tapping the source application name is a shortcut, while long-pressing it still opens session diagnostics.
+Use the always-visible `SOURCE / SKIN` button to choose automatic session following or pin a specific active media app, even when no session is playing. The same panel switches between the original Hi-Fi Green skin and Warm Amber; both choices persist across launches. Session diagnostics is also an explicit tool in this panel. Tapping the source application name remains a shortcut, while long-pressing it opens diagnostics directly.

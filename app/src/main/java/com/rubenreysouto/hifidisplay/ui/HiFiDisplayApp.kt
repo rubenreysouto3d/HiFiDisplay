@@ -52,6 +52,7 @@ fun HiFiDisplayApp(
 ) {
     val palette = skin.palette
     var showSourcePicker by remember { mutableStateOf(false) }
+    var showDiagnostics by remember { mutableStateOf(false) }
     MaterialTheme(
         colorScheme = darkColorScheme(
             background = palette.background,
@@ -78,6 +79,7 @@ fun HiFiDisplayApp(
                         onNext = onNext,
                         onSeek = onSeek,
                         onShowSources = { showSourcePicker = true },
+                        onShowDiagnostics = { showDiagnostics = true },
                     )
                 }
                 DisplayMenuButton(
@@ -93,8 +95,15 @@ fun HiFiDisplayApp(
                             showSourcePicker = false
                         },
                         onSelectSkin = onSelectSkin,
+                        onShowDiagnostics = {
+                            showSourcePicker = false
+                            showDiagnostics = true
+                        },
                         onDismiss = { showSourcePicker = false },
                     )
+                }
+                if (showDiagnostics) {
+                    DiagnosticsOverlay(state, onDismiss = { showDiagnostics = false })
                 }
             }
         }
@@ -108,6 +117,7 @@ private fun DisplayMenuButton(modifier: Modifier = Modifier, onClick: () -> Unit
             .clip(RoundedCornerShape(4.dp))
             .background(SurfaceRaised.copy(alpha = .94f))
             .clickable(onClick = onClick)
+            .heightIn(min = 48.dp)
             .padding(horizontal = 12.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -131,7 +141,7 @@ private fun SessionError() {
             Spacer(Modifier.height(20.dp))
             Text("No se pudo acceder a las sesiones", color = PrimaryText, fontSize = 28.sp, fontWeight = FontWeight.Light)
             Spacer(Modifier.height(8.dp))
-            Text("La conexión se reintentará al volver a la aplicación", color = SecondaryText)
+            Text("La conexión se reintentará automáticamente", color = SecondaryText)
         }
     }
 }
@@ -192,8 +202,8 @@ private fun NowPlaying(
     onNext: () -> Unit,
     onSeek: (Long) -> Unit,
     onShowSources: () -> Unit,
+    onShowDiagnostics: () -> Unit,
 ) {
-    var showDiagnostics by remember { mutableStateOf(false) }
     Box(Modifier.fillMaxSize()) {
         Row(Modifier.fillMaxSize().padding(horizontal = 36.dp, vertical = 28.dp), horizontalArrangement = Arrangement.spacedBy(40.dp)) {
             Artwork(state, Modifier.fillMaxHeight().aspectRatio(1f))
@@ -201,7 +211,7 @@ private fun NowPlaying(
                 SourceHeader(
                     state = state,
                     onShowSources = onShowSources,
-                    onShowDiagnostics = { showDiagnostics = true },
+                    onShowDiagnostics = onShowDiagnostics,
                 )
                 Spacer(Modifier.weight(0.7f))
                 Text(state.title ?: "Título no disponible", color = PrimaryText, fontSize = 38.sp, fontWeight = FontWeight.Medium, maxLines = 2, overflow = TextOverflow.Ellipsis)
@@ -216,7 +226,6 @@ private fun NowPlaying(
                 Progress(state, onSeek)
             }
         }
-        if (showDiagnostics) DiagnosticsOverlay(state, onDismiss = { showDiagnostics = false })
     }
 }
 
@@ -227,12 +236,15 @@ private fun SourceHeader(
     onShowDiagnostics: () -> Unit,
 ) {
     Row(
-        modifier = Modifier.pointerInput(Unit) {
-            detectTapGestures(
-                onTap = { onShowSources() },
-                onLongPress = { onShowDiagnostics() },
-            )
-        },
+        modifier = Modifier
+            .heightIn(min = 48.dp)
+            .widthIn(max = 260.dp)
+            .pointerInput(Unit) {
+                detectTapGestures(
+                    onTap = { onShowSources() },
+                    onLongPress = { onShowDiagnostics() },
+                )
+            },
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(
@@ -248,6 +260,9 @@ private fun SourceHeader(
             fontSize = 11.sp,
             fontFamily = FontFamily.Monospace,
             letterSpacing = 1.7.sp,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f),
         )
         Spacer(Modifier.width(5.dp))
         Icon(Icons.Rounded.ExpandMore, "Cambiar fuente", tint = SecondaryText, modifier = Modifier.size(16.dp))
@@ -260,6 +275,7 @@ private fun SourcePickerOverlay(
     skin: DisplaySkin,
     onSelectSource: (String?) -> Unit,
     onSelectSkin: (DisplaySkin) -> Unit,
+    onShowDiagnostics: () -> Unit,
     onDismiss: () -> Unit,
 ) {
     Box(
@@ -271,14 +287,14 @@ private fun SourcePickerOverlay(
         Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    "SOURCE / DISPLAY",
+                    "SOURCE / SKIN",
                     color = Accent,
                     fontSize = 13.sp,
                     fontFamily = FontFamily.Monospace,
                     letterSpacing = 2.sp,
                     modifier = Modifier.weight(1f),
                 )
-                IconButton(onClick = onDismiss, modifier = Modifier.size(36.dp)) {
+                IconButton(onClick = onDismiss, modifier = Modifier.size(48.dp)) {
                     Icon(Icons.Rounded.Close, "Cerrar", tint = SecondaryText)
                 }
             }
@@ -291,15 +307,24 @@ private fun SourcePickerOverlay(
                 selected = state.pinnedSourcePackage == null,
                 onClick = { onSelectSource(null) },
             )
+            if (state.availableSources.isEmpty()) {
+                Text(
+                    "NO ACTIVE MEDIA SESSIONS",
+                    color = SecondaryText.copy(alpha = .7f),
+                    fontSize = 10.sp,
+                    fontFamily = FontFamily.Monospace,
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+                )
+            }
             val pinnedUnavailable = state.pinnedSourcePackage?.takeIf { pinned ->
                 state.availableSources.none { it.packageName == pinned }
             }
             pinnedUnavailable?.let { packageName ->
                 PickerRow(
                     title = packageName,
-                    subtitle = "PINNED · NOT ACTIVE",
+                    subtitle = "PINNED · NOT ACTIVE · TAP TO CLEAR",
                     selected = true,
-                    onClick = { onSelectSource(packageName) },
+                    onClick = { onSelectSource(null) },
                 )
             }
             state.availableSources.forEach { source ->
@@ -326,6 +351,16 @@ private fun SourcePickerOverlay(
                     onClick = { onSelectSkin(option) },
                 )
             }
+            Spacer(Modifier.height(22.dp))
+            Text("TOOLS", color = SecondaryText, fontSize = 10.sp, fontFamily = FontFamily.Monospace, letterSpacing = 1.5.sp)
+            Spacer(Modifier.height(7.dp))
+            PickerRow(
+                title = "Session diagnostics",
+                subtitle = if (state.hasActiveSession) "VIEW SESSION CAPABILITIES" else "REQUIRES AN ACTIVE SESSION",
+                selected = false,
+                enabled = state.hasActiveSession,
+                onClick = onShowDiagnostics,
+            )
         }
     }
 }
@@ -335,14 +370,16 @@ private fun PickerRow(
     title: String,
     subtitle: String,
     selected: Boolean,
+    enabled: Boolean = true,
     onClick: () -> Unit,
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .heightIn(min = 48.dp)
             .clip(RoundedCornerShape(4.dp))
             .background(if (selected) Accent.copy(alpha = .12f) else Color.Transparent)
-            .clickable(onClick = onClick)
+            .clickable(enabled = enabled, onClick = onClick)
             .padding(horizontal = 14.dp, vertical = 9.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -354,8 +391,8 @@ private fun PickerRow(
         )
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
-            Text(title, color = PrimaryText, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text(subtitle, color = SecondaryText, fontSize = 9.sp, fontFamily = FontFamily.Monospace, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(title, color = PrimaryText.copy(alpha = if (enabled) 1f else .45f), fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(subtitle, color = SecondaryText.copy(alpha = if (enabled) 1f else .45f), fontSize = 9.sp, fontFamily = FontFamily.Monospace, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
         if (selected) Text("SELECTED", color = Accent, fontSize = 9.sp, fontFamily = FontFamily.Monospace)
     }
@@ -372,15 +409,18 @@ private fun DiagnosticsOverlay(state: MediaUiState, onDismiss: () -> Unit) {
             .padding(horizontal = 52.dp, vertical = 36.dp),
     ) {
         Column(Modifier.fillMaxSize()) {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     "SESSION DIAGNOSTICS",
                     color = Accent,
                     fontSize = 13.sp,
                     fontFamily = FontFamily.Monospace,
                     letterSpacing = 2.sp,
+                    modifier = Modifier.weight(1f),
                 )
-                Text("TOCA PARA CERRAR", color = SecondaryText, fontSize = 10.sp, fontFamily = FontFamily.Monospace)
+                IconButton(onClick = onDismiss, modifier = Modifier.size(48.dp)) {
+                    Icon(Icons.Rounded.Close, "Cerrar diagnóstico", tint = SecondaryText)
+                }
             }
             Spacer(Modifier.height(28.dp))
             DiagnosticLine("PACKAGE", diagnostics.packageName ?: "—")
@@ -450,15 +490,21 @@ private fun Artwork(state: MediaUiState, modifier: Modifier) {
 
 @Composable
 private fun PlayerControls(state: MediaUiState, onPlay: () -> Unit, onPause: () -> Unit, onPrevious: () -> Unit, onNext: () -> Unit) {
+    val hasPrimaryControl = if (state.isPlaying) state.canPause else state.canPlay
+    val hasAnyControl = state.canSkipPrevious || hasPrimaryControl || state.canSkipNext
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(24.dp, Alignment.CenterHorizontally),
     ) {
-        if (state.canSkipPrevious) ControlButton(Icons.Rounded.SkipPrevious, onPrevious, "Anterior")
-        if (state.isPlaying && state.canPause) ControlButton(Icons.Rounded.Pause, onPause, "Pausa", true)
-        else if (!state.isPlaying && state.canPlay) ControlButton(Icons.Rounded.PlayArrow, onPlay, "Reproducir", true)
-        if (state.canSkipNext) ControlButton(Icons.Rounded.SkipNext, onNext, "Siguiente")
+        if (!hasAnyControl) {
+            Text("CONTROLES NO DISPONIBLES", color = SecondaryText, fontSize = 10.sp, fontFamily = FontFamily.Monospace, letterSpacing = 1.2.sp)
+        } else {
+            if (state.canSkipPrevious) ControlButton(Icons.Rounded.SkipPrevious, onPrevious, "Anterior")
+            if (state.isPlaying && state.canPause) ControlButton(Icons.Rounded.Pause, onPause, "Pausa", true)
+            else if (!state.isPlaying && state.canPlay) ControlButton(Icons.Rounded.PlayArrow, onPlay, "Reproducir", true)
+            if (state.canSkipNext) ControlButton(Icons.Rounded.SkipNext, onNext, "Siguiente")
+        }
     }
 }
 
