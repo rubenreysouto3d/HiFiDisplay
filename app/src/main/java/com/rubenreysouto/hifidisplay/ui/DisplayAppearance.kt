@@ -17,6 +17,16 @@ enum class DisplayDesign(
         storageKey = "studio-ledger",
         displayName = "Studio Ledger",
         descriptor = "SIGNAL · INDEX · PRECISION",
+    ),
+    MONOLITH_GLASS(
+        storageKey = "monolith-glass",
+        displayName = "Monolith Glass",
+        descriptor = "CINEMA · DEPTH · PRESENCE",
+    ),
+    PRECISION_DECK(
+        storageKey = "precision-deck",
+        displayName = "Precision Deck",
+        descriptor = "TIMEBASE · CONTROL · DETAIL",
     );
 
     companion object {
@@ -67,10 +77,43 @@ enum class ArtworkMotion(
     }
 }
 
+enum class PlaybackArtworkEffect(
+    val storageKey: String,
+    val displayName: String,
+    val descriptor: String,
+) {
+    PULSE(
+        storageKey = "pulse",
+        displayName = "Pulse",
+        descriptor = "GENTLE CADENCE · PLAYBACK ACTIVE",
+    ),
+    DRIFT(
+        storageKey = "drift",
+        displayName = "Drift",
+        descriptor = "SLOW DEPTH · CINEMATIC MOTION",
+    ),
+    HALO(
+        storageKey = "halo",
+        displayName = "Halo",
+        descriptor = "STABLE COVER · BREATHING LIGHT",
+    ),
+    STILL(
+        storageKey = "still",
+        displayName = "Still",
+        descriptor = "STATIC · ZERO MOTION",
+    );
+
+    companion object {
+        fun fromStorage(value: String?): PlaybackArtworkEffect =
+            entries.firstOrNull { it.storageKey == value } ?: PULSE
+    }
+}
+
 data class DisplayAppearance(
     val design: DisplayDesign = DisplayDesign.MODERN_REFERENCE,
     val palette: ColorPalette = ColorPalette.HIFI_GREEN,
     val artworkMotion: ArtworkMotion = ArtworkMotion.FOCUS,
+    val playbackArtworkEffect: PlaybackArtworkEffect = PlaybackArtworkEffect.PULSE,
 )
 
 @Immutable

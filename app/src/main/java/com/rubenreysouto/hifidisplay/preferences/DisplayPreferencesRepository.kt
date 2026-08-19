@@ -5,6 +5,7 @@ import com.rubenreysouto.hifidisplay.ui.ArtworkMotion
 import com.rubenreysouto.hifidisplay.ui.ColorPalette
 import com.rubenreysouto.hifidisplay.ui.DisplayAppearance
 import com.rubenreysouto.hifidisplay.ui.DisplayDesign
+import com.rubenreysouto.hifidisplay.ui.PlaybackArtworkEffect
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -20,6 +21,9 @@ class DisplayPreferencesRepository(context: Context) {
                     ?: preferences.getString(LEGACY_SKIN_KEY, null),
             ),
             artworkMotion = ArtworkMotion.fromStorage(preferences.getString(ARTWORK_MOTION_KEY, null)),
+            playbackArtworkEffect = PlaybackArtworkEffect.fromStorage(
+                preferences.getString(PLAYBACK_ARTWORK_EFFECT_KEY, null),
+            ),
         ),
     )
     val appearance: StateFlow<DisplayAppearance> = _appearance.asStateFlow()
@@ -45,11 +49,18 @@ class DisplayPreferencesRepository(context: Context) {
         preferences.edit().putString(ARTWORK_MOTION_KEY, motion.storageKey).apply()
     }
 
+    fun selectPlaybackArtworkEffect(effect: PlaybackArtworkEffect) {
+        if (_appearance.value.playbackArtworkEffect == effect) return
+        _appearance.value = _appearance.value.copy(playbackArtworkEffect = effect)
+        preferences.edit().putString(PLAYBACK_ARTWORK_EFFECT_KEY, effect.storageKey).apply()
+    }
+
     private companion object {
         const val PREFERENCES_NAME = "display_preferences"
         const val DESIGN_KEY = "design"
         const val PALETTE_KEY = "palette"
         const val ARTWORK_MOTION_KEY = "artwork_motion"
+        const val PLAYBACK_ARTWORK_EFFECT_KEY = "playback_artwork_effect"
         const val LEGACY_SKIN_KEY = "skin"
     }
 }

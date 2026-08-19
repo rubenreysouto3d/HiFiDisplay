@@ -64,3 +64,11 @@ Artwork motion is independent from design and palette and persists across launch
 Artwork and metadata taps now toggle between the transient control HUD and ambient mode instead of silently restarting the same timeout. A short in-artwork `CONTROLS` / `AMBIENT` confirmation makes the result explicit, while transport and seek interactions keep controls available without changing modes. The shared interaction reducer covers reveal, toggle, keep-alive, timeout, and overlay behavior independently from any skin.
 
 The source entry is now a quieter compact plate with a 48 dp semantic touch target, lower contrast, and less width. Control entrances combine restrained scale and fade. Artwork motion is deliberately more perceptible, adds a directional `Deck` changeover, and includes an A/B preview inside `SOURCE / DISPLAY`; tapping any effect replays its actual timing before it is used on a track change.
+
+## v0.9 playback presence and signature displays
+
+Ambient mode now removes the complete transient HUD, including the source entry. Tapping artwork or metadata reveals source and supported transport controls again without moving the permanent composition.
+
+Track transitions and continuous playback effects are separate preferences. `Pulse`, `Drift`, and `Halo` animate only while the active session reports playback; `Still` disables continuous motion. These are deliberately described as visual cadence rather than audio synchronization because Android `MediaSession` does not expose a beat or amplitude stream.
+
+The display engine now includes four designs. `Monolith Glass` uses a cinematic art frame, quiet glass metadata plane, luminous timeline, and translucent controls. `Precision Deck` uses indexed metadata, a real position-driven timebase dial, segmented timeline, and machined controls. Both remain independent from the selected color palette and preserve the same session capability rules as the existing designs.

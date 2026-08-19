@@ -7,6 +7,7 @@ import com.rubenreysouto.hifidisplay.preferences.DisplayPreferencesRepository
 import com.rubenreysouto.hifidisplay.ui.ArtworkMotion
 import com.rubenreysouto.hifidisplay.ui.ColorPalette
 import com.rubenreysouto.hifidisplay.ui.DisplayDesign
+import com.rubenreysouto.hifidisplay.ui.PlaybackArtworkEffect
 
 class HiFiDisplayViewModel(application: Application) : AndroidViewModel(application) {
     private val repository = MediaSessionRepository.get(application)
@@ -26,4 +27,6 @@ class HiFiDisplayViewModel(application: Application) : AndroidViewModel(applicat
     fun selectPalette(palette: ColorPalette) = displayPreferences.selectPalette(palette)
     fun selectDesign(design: DisplayDesign) = displayPreferences.selectDesign(design)
     fun selectArtworkMotion(motion: ArtworkMotion) = displayPreferences.selectArtworkMotion(motion)
+    fun selectPlaybackArtworkEffect(effect: PlaybackArtworkEffect) =
+        displayPreferences.selectPlaybackArtworkEffect(effect)
 }

@@ -13,6 +13,8 @@ class DisplayAppearanceTest {
     @Test
     fun `stored display design is restored independently`() {
         assertEquals(DisplayDesign.STUDIO_LEDGER, DisplayDesign.fromStorage("studio-ledger"))
+        assertEquals(DisplayDesign.MONOLITH_GLASS, DisplayDesign.fromStorage("monolith-glass"))
+        assertEquals(DisplayDesign.PRECISION_DECK, DisplayDesign.fromStorage("precision-deck"))
     }
 
     @Test
@@ -27,6 +29,14 @@ class DisplayAppearanceTest {
         assertEquals(ColorPalette.HIFI_GREEN, ColorPalette.fromStorage("future-palette"))
         assertEquals(DisplayDesign.MODERN_REFERENCE, DisplayDesign.fromStorage("future-design"))
         assertEquals(ArtworkMotion.FOCUS, ArtworkMotion.fromStorage("future-motion"))
+        assertEquals(PlaybackArtworkEffect.PULSE, PlaybackArtworkEffect.fromStorage("future-effect"))
+    }
+
+    @Test
+    fun `stored playback effect is restored independently`() {
+        assertEquals(PlaybackArtworkEffect.DRIFT, PlaybackArtworkEffect.fromStorage("drift"))
+        assertEquals(PlaybackArtworkEffect.HALO, PlaybackArtworkEffect.fromStorage("halo"))
+        assertEquals(PlaybackArtworkEffect.STILL, PlaybackArtworkEffect.fromStorage("still"))
     }
 
     @Test
@@ -65,6 +75,11 @@ class DisplayAppearanceTest {
         assertNotEquals(reference.artworkTreatment, studio.artworkTreatment)
         assertNotEquals(reference.controlTreatment, studio.controlTreatment)
         assertNotEquals(reference.progressTreatment, studio.progressTreatment)
+
+        val allTokens = DisplayDesign.entries.map(DisplayDesign::tokens)
+        assertEquals(DisplayDesign.entries.size, allTokens.map { it.artworkTreatment }.distinct().size)
+        assertEquals(DisplayDesign.entries.size, allTokens.map { it.controlTreatment }.distinct().size)
+        assertEquals(DisplayDesign.entries.size, allTokens.map { it.progressTreatment }.distinct().size)
     }
 
     @Test

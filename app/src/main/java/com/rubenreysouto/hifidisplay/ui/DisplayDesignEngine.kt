@@ -12,16 +12,22 @@ internal enum class ArtworkPlacement {
 internal enum class ArtworkTreatment {
     REFERENCE,
     STUDIO_DECK,
+    MONOLITH_GLASS,
+    PRECISION_DIAL,
 }
 
 internal enum class ProgressTreatment {
     CONTINUOUS,
     TICKED,
+    LUMINOUS,
+    SEGMENTED,
 }
 
 internal enum class ControlTreatment {
     CIRCULAR,
     CONSOLE,
+    GLASS,
+    MACHINED,
 }
 
 internal enum class DisplayLayoutMode {
@@ -67,6 +73,30 @@ internal val DisplayDesign.tokens: DisplayDesignTokens
             contentGap = 52.dp,
             artworkCornerRadius = 2.dp,
             sourceCornerRadius = 2.dp,
+        )
+
+        DisplayDesign.MONOLITH_GLASS -> DisplayDesignTokens(
+            artworkPlacement = ArtworkPlacement.LEADING,
+            artworkTreatment = ArtworkTreatment.MONOLITH_GLASS,
+            progressTreatment = ProgressTreatment.LUMINOUS,
+            controlTreatment = ControlTreatment.GLASS,
+            horizontalPadding = 24.dp,
+            verticalPadding = 20.dp,
+            contentGap = 28.dp,
+            artworkCornerRadius = 18.dp,
+            sourceCornerRadius = 12.dp,
+        )
+
+        DisplayDesign.PRECISION_DECK -> DisplayDesignTokens(
+            artworkPlacement = ArtworkPlacement.TRAILING,
+            artworkTreatment = ArtworkTreatment.PRECISION_DIAL,
+            progressTreatment = ProgressTreatment.SEGMENTED,
+            controlTreatment = ControlTreatment.MACHINED,
+            horizontalPadding = 38.dp,
+            verticalPadding = 24.dp,
+            contentGap = 42.dp,
+            artworkCornerRadius = 4.dp,
+            sourceCornerRadius = 3.dp,
         )
     }
 
