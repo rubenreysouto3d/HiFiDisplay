@@ -1112,7 +1112,12 @@ private fun CrystalAtriumLayout(
                             )
                         }
                     }
-                    CrystalMetadata(state, compact, Modifier.weight(1f))
+                    CrystalMetadata(
+                        state = state,
+                        compact = compact,
+                        controlsVisible = controlsVisible,
+                        modifier = Modifier.weight(1f),
+                    )
                     Box(
                         Modifier
                             .fillMaxWidth()
@@ -1223,7 +1228,12 @@ private fun CrystalOpticalAtmosphere(oled: Boolean) {
 }
 
 @Composable
-private fun CrystalMetadata(state: MediaUiState, compact: Boolean, modifier: Modifier = Modifier) {
+private fun CrystalMetadata(
+    state: MediaUiState,
+    compact: Boolean,
+    controlsVisible: Boolean,
+    modifier: Modifier = Modifier,
+) {
     val copy = TrackCopy(
         title = state.title?.takeUnless(String::isBlank) ?: "Título no disponible",
         artist = state.artist?.takeUnless(String::isBlank),
@@ -1232,23 +1242,31 @@ private fun CrystalMetadata(state: MediaUiState, compact: Boolean, modifier: Mod
     Box(modifier.fillMaxWidth(), contentAlignment = Alignment.CenterStart) {
         TrackCopyTransition(copy, DisplayDesign.CRYSTAL_ATRIUM, "crystal metadata") { track ->
             Column(Modifier.fillMaxWidth()) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        "NOW REPRODUCING",
-                        color = Accent.copy(alpha = .82f),
-                        fontSize = if (compact) 7.sp else 8.sp,
-                        fontFamily = FontFamily.Monospace,
-                        letterSpacing = 1.8.sp,
-                    )
-                    Spacer(Modifier.width(10.dp))
-                    Box(
-                        Modifier
-                            .width(if (compact) 28.dp else 42.dp)
-                            .height(1.dp)
-                            .background(Brush.horizontalGradient(listOf(Accent.copy(alpha = .62f), Color.Transparent))),
-                    )
+                AnimatedVisibility(
+                    visible = !controlsVisible,
+                    enter = fadeIn(tween(160)),
+                    exit = fadeOut(tween(110)),
+                ) {
+                    Column {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                "NOW REPRODUCING",
+                                color = Accent.copy(alpha = .82f),
+                                fontSize = if (compact) 7.sp else 8.sp,
+                                fontFamily = FontFamily.Monospace,
+                                letterSpacing = 1.8.sp,
+                            )
+                            Spacer(Modifier.width(10.dp))
+                            Box(
+                                Modifier
+                                    .width(if (compact) 28.dp else 42.dp)
+                                    .height(1.dp)
+                                    .background(Brush.horizontalGradient(listOf(Accent.copy(alpha = .62f), Color.Transparent))),
+                            )
+                        }
+                        Spacer(Modifier.height(if (compact) 12.dp else 18.dp))
+                    }
                 }
-                Spacer(Modifier.height(if (compact) 12.dp else 18.dp))
                 Text(
                     track.title,
                     color = PrimaryText,
