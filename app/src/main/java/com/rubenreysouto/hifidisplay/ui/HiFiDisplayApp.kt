@@ -967,9 +967,7 @@ private fun CrystalAtriumLayout(
 ) {
     val design = DisplayDesign.CRYSTAL_ATRIUM
     val oled = OledPalette
-    val sheetShape = RoundedCornerShape(if (compact) 16.dp else 22.dp)
-    val crystalPrimary = PrimaryText
-    val crystalAccent = Accent
+    val sheetShape = RoundedCornerShape(if (compact) 20.dp else 30.dp)
     Box(
         Modifier
             .fillMaxSize()
@@ -979,32 +977,15 @@ private fun CrystalAtriumLayout(
                     Brush.linearGradient(listOf(Background, Background))
                 } else {
                     Brush.radialGradient(
-                        colors = listOf(PrimaryText.copy(alpha = .1f), Accent.copy(alpha = .09f), Surface.copy(alpha = .42f), Background),
-                        radius = if (compact) 760f else 1_320f,
+                        colors = listOf(PrimaryText.copy(alpha = .115f), Accent.copy(alpha = .055f), Surface.copy(alpha = .3f), Background),
+                        center = androidx.compose.ui.geometry.Offset.Zero,
+                        radius = if (compact) 820f else 1_480f,
                     )
                 },
             )
-            .padding(horizontal = if (compact) 18.dp else 30.dp, vertical = if (compact) 14.dp else 24.dp),
+            .padding(horizontal = if (compact) 18.dp else 34.dp, vertical = if (compact) 14.dp else 26.dp),
     ) {
-        if (!oled) {
-            Canvas(Modifier.fillMaxSize()) {
-                repeat(5) { index ->
-                    val offset = size.width * (.03f + index * .18f)
-                    drawLine(
-                        color = crystalPrimary.copy(alpha = .018f + index * .004f),
-                        start = androidx.compose.ui.geometry.Offset(offset, 0f),
-                        end = androidx.compose.ui.geometry.Offset(offset + size.height * .42f, size.height),
-                        strokeWidth = 1.dp.toPx(),
-                    )
-                }
-                drawLine(
-                    color = crystalAccent.copy(alpha = .08f),
-                    start = androidx.compose.ui.geometry.Offset(size.width * .64f, 0f),
-                    end = androidx.compose.ui.geometry.Offset(size.width * .58f, size.height),
-                    strokeWidth = 1.dp.toPx(),
-                )
-            }
-        }
+        CrystalOpticalAtmosphere(oled = oled)
         Box(
             Modifier
                 .fillMaxSize()
@@ -1012,65 +993,77 @@ private fun CrystalAtriumLayout(
                 .background(
                     Brush.linearGradient(
                         colorStops = arrayOf(
-                            0f to PrimaryText.copy(alpha = .14f),
-                            .18f to PrimaryText.copy(alpha = .045f),
-                            .52f to Surface.copy(alpha = .34f),
-                            .82f to Accent.copy(alpha = .035f),
-                            1f to SurfaceRaised.copy(alpha = .2f),
+                            0f to PrimaryText.copy(alpha = if (oled) .045f else .105f),
+                            .12f to PrimaryText.copy(alpha = if (oled) .012f else .038f),
+                            .48f to Surface.copy(alpha = if (oled) .12f else .24f),
+                            .78f to Accent.copy(alpha = if (oled) .012f else .03f),
+                            1f to SurfaceRaised.copy(alpha = if (oled) .08f else .18f),
                         ),
                     ),
                 )
-                .border(1.dp, PrimaryText.copy(alpha = .3f), sheetShape),
+                .border(1.dp, PrimaryText.copy(alpha = if (oled) .18f else .28f), sheetShape),
         ) {
             Box(
                 Modifier
                     .matchParentSize()
-                    .padding(6.dp)
-                    .border(1.dp, PrimaryText.copy(alpha = .08f), RoundedCornerShape(if (compact) 12.dp else 17.dp)),
+                    .padding(if (compact) 6.dp else 8.dp)
+                    .border(1.dp, PrimaryText.copy(alpha = .07f), RoundedCornerShape(if (compact) 15.dp else 22.dp)),
             )
             Box(
-                Modifier
-                    .fillMaxWidth(.56f)
+                Modifier.align(Alignment.TopCenter)
+                    .fillMaxWidth(.72f)
                     .height(1.dp)
                     .background(
                         Brush.horizontalGradient(
-                            listOf(Color.Transparent, PrimaryText.copy(alpha = .72f), Color.Transparent),
+                            listOf(Color.Transparent, PrimaryText.copy(alpha = .82f), Color.Transparent),
                         ),
                     ),
             )
+            Box(
+                Modifier.align(Alignment.BottomCenter)
+                    .fillMaxWidth(.42f)
+                    .height(1.dp)
+                    .background(Brush.horizontalGradient(listOf(Color.Transparent, Accent.copy(alpha = .4f), Color.Transparent))),
+            )
             Row(
-                Modifier.fillMaxSize().padding(if (compact) 14.dp else 22.dp),
+                Modifier.fillMaxSize().padding(if (compact) 16.dp else 24.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Artwork(
-                    state = state,
-                    design = design,
-                    motion = motion,
-                    playbackEffect = playbackEffect,
-                    pressed = artworkPressed,
-                    controlCue = null,
-                    modifier = Modifier
-                        .fillMaxHeight()
-                        .aspectRatio(1f)
-                        .graphicsLayer { scaleX = artworkScale; scaleY = artworkScale }
-                        .clickable(
-                            interactionSource = artworkInteraction,
-                            indication = null,
-                            onClick = onToggleControls,
-                        ),
-                )
-                Spacer(Modifier.width(if (compact) 18.dp else 30.dp))
                 Box(
                     Modifier
-                        .fillMaxHeight(.82f)
-                        .width(1.dp)
-                        .background(
-                            Brush.verticalGradient(
-                                listOf(Color.Transparent, PrimaryText.copy(alpha = .28f), Accent.copy(alpha = .34f), Color.Transparent),
+                        .fillMaxHeight()
+                        .aspectRatio(1f),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Box(
+                        Modifier
+                            .fillMaxHeight(.9f)
+                            .width(if (compact) 12.dp else 16.dp)
+                            .align(Alignment.CenterStart)
+                            .background(
+                                Brush.horizontalGradient(
+                                    listOf(Accent.copy(alpha = .14f), PrimaryText.copy(alpha = .035f), Color.Transparent),
+                                ),
                             ),
-                        ),
-                )
-                Spacer(Modifier.width(if (compact) 18.dp else 30.dp))
+                    )
+                    Artwork(
+                        state = state,
+                        design = design,
+                        motion = motion,
+                        playbackEffect = playbackEffect,
+                        pressed = artworkPressed,
+                        controlCue = null,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .graphicsLayer { scaleX = artworkScale; scaleY = artworkScale }
+                            .clickable(
+                                interactionSource = artworkInteraction,
+                                indication = null,
+                                onClick = onToggleControls,
+                            ),
+                    )
+                }
+                Spacer(Modifier.width(if (compact) 22.dp else 38.dp))
                 Column(
                     Modifier
                         .weight(1f)
@@ -1078,7 +1071,7 @@ private fun CrystalAtriumLayout(
                         .graphicsLayer { alpha = 1f },
                 ) {
                     Row(
-                        Modifier.fillMaxWidth().height(if (compact) 68.dp else 76.dp),
+                        Modifier.fillMaxWidth().height(if (compact) 48.dp else 58.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         AnimatedVisibility(
@@ -1087,11 +1080,17 @@ private fun CrystalAtriumLayout(
                             exit = fadeOut(tween(120)),
                         ) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Box(Modifier.size(5.dp).clip(CircleShape).background(if (state.isPlaying) Accent else SecondaryText.copy(alpha = .42f)))
-                                Spacer(Modifier.width(9.dp))
+                                Box(
+                                    Modifier
+                                        .size(if (state.isPlaying) 7.dp else 5.dp)
+                                        .clip(CircleShape)
+                                        .background(if (state.isPlaying) Accent else SecondaryText.copy(alpha = .42f))
+                                        .border(1.dp, PrimaryText.copy(alpha = .16f), CircleShape),
+                                )
+                                Spacer(Modifier.width(10.dp))
                                 Text(
-                                    if (state.isPlaying) "OPTICAL PLAYBACK" else "SESSION PAUSED",
-                                    color = PrimaryText.copy(alpha = .72f),
+                                    if (state.isPlaying) "SIGNAL LOCKED" else "SIGNAL HELD",
+                                    color = PrimaryText.copy(alpha = .78f),
                                     fontSize = if (compact) 7.sp else 8.sp,
                                     fontFamily = FontFamily.Monospace,
                                     letterSpacing = 1.8.sp,
@@ -1105,7 +1104,7 @@ private fun CrystalAtriumLayout(
                             exit = fadeOut(tween(120)),
                         ) {
                             Text(
-                                "ATRIUM / 01",
+                                "CRYSTAL  /  OPTICAL STAGE 01",
                                 color = SecondaryText.copy(alpha = .64f),
                                 fontSize = 7.sp,
                                 fontFamily = FontFamily.Monospace,
@@ -1114,13 +1113,26 @@ private fun CrystalAtriumLayout(
                         }
                     }
                     CrystalMetadata(state, compact, Modifier.weight(1f))
-                    Progress(
-                        state = state,
-                        design = design,
-                        controlsVisible = controlsVisible,
-                        onInteraction = onInteraction,
-                        onSeek = onSeek,
-                    )
+                    Box(
+                        Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(if (compact) 10.dp else 13.dp))
+                            .background(
+                                Brush.linearGradient(
+                                    listOf(PrimaryText.copy(alpha = .035f), SurfaceRaised.copy(alpha = .18f), Color.Transparent),
+                                ),
+                            )
+                            .border(1.dp, PrimaryText.copy(alpha = .085f), RoundedCornerShape(if (compact) 10.dp else 13.dp))
+                            .padding(horizontal = if (compact) 12.dp else 16.dp, vertical = if (compact) 8.dp else 11.dp),
+                    ) {
+                        Progress(
+                            state = state,
+                            design = design,
+                            controlsVisible = controlsVisible,
+                            onInteraction = onInteraction,
+                            onSeek = onSeek,
+                        )
+                    }
                 }
             }
         }
@@ -1132,10 +1144,10 @@ private fun CrystalAtriumLayout(
         ) {
             Row(
                 Modifier
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(Brush.linearGradient(listOf(PrimaryText.copy(alpha = .16f), Surface.copy(alpha = .82f))))
-                    .border(1.dp, PrimaryText.copy(alpha = .3f), RoundedCornerShape(10.dp))
-                    .padding(horizontal = 7.dp, vertical = 6.dp),
+                    .clip(RoundedCornerShape(18.dp))
+                    .background(Brush.linearGradient(listOf(PrimaryText.copy(alpha = .12f), Surface.copy(alpha = .72f), SurfaceRaised.copy(alpha = .56f))))
+                    .border(1.dp, PrimaryText.copy(alpha = .24f), RoundedCornerShape(18.dp))
+                    .padding(horizontal = 8.dp, vertical = 7.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 SourceHeader(
@@ -1167,6 +1179,50 @@ private fun CrystalAtriumLayout(
 }
 
 @Composable
+private fun CrystalOpticalAtmosphere(oled: Boolean) {
+    val opticalPrimary = PrimaryText
+    val opticalAccent = Accent
+    if (oled) {
+        Canvas(Modifier.fillMaxSize()) {
+            drawLine(
+                opticalAccent.copy(alpha = .075f),
+                androidx.compose.ui.geometry.Offset(size.width * .08f, 0f),
+                androidx.compose.ui.geometry.Offset(size.width * .28f, size.height),
+                1.dp.toPx(),
+            )
+        }
+        return
+    }
+    Canvas(Modifier.fillMaxSize()) {
+        drawCircle(
+            color = opticalPrimary.copy(alpha = .028f),
+            radius = size.minDimension * .72f,
+            center = androidx.compose.ui.geometry.Offset(size.width * .08f, size.height * .04f),
+        )
+        drawCircle(
+            color = opticalAccent.copy(alpha = .022f),
+            radius = size.minDimension * .64f,
+            center = androidx.compose.ui.geometry.Offset(size.width * .91f, size.height * .94f),
+        )
+        repeat(4) { index ->
+            val x = size.width * (.12f + index * .19f)
+            drawLine(
+                opticalPrimary.copy(alpha = .015f + index * .004f),
+                androidx.compose.ui.geometry.Offset(x, 0f),
+                androidx.compose.ui.geometry.Offset(x + size.height * .3f, size.height),
+                1.dp.toPx(),
+            )
+        }
+        drawLine(
+            opticalAccent.copy(alpha = .11f),
+            androidx.compose.ui.geometry.Offset(size.width * .57f, 0f),
+            androidx.compose.ui.geometry.Offset(size.width * .51f, size.height),
+            1.dp.toPx(),
+        )
+    }
+}
+
+@Composable
 private fun CrystalMetadata(state: MediaUiState, compact: Boolean, modifier: Modifier = Modifier) {
     val copy = TrackCopy(
         title = state.title?.takeUnless(String::isBlank) ?: "Título no disponible",
@@ -1176,13 +1232,30 @@ private fun CrystalMetadata(state: MediaUiState, compact: Boolean, modifier: Mod
     Box(modifier.fillMaxWidth(), contentAlignment = Alignment.CenterStart) {
         TrackCopyTransition(copy, DisplayDesign.CRYSTAL_ATRIUM, "crystal metadata") { track ->
             Column(Modifier.fillMaxWidth()) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        "NOW REPRODUCING",
+                        color = Accent.copy(alpha = .82f),
+                        fontSize = if (compact) 7.sp else 8.sp,
+                        fontFamily = FontFamily.Monospace,
+                        letterSpacing = 1.8.sp,
+                    )
+                    Spacer(Modifier.width(10.dp))
+                    Box(
+                        Modifier
+                            .width(if (compact) 28.dp else 42.dp)
+                            .height(1.dp)
+                            .background(Brush.horizontalGradient(listOf(Accent.copy(alpha = .62f), Color.Transparent))),
+                    )
+                }
+                Spacer(Modifier.height(if (compact) 12.dp else 18.dp))
                 Text(
                     track.title,
                     color = PrimaryText,
-                    fontSize = if (compact) 31.sp else 46.sp,
-                    lineHeight = if (compact) 34.sp else 49.sp,
-                    fontWeight = FontWeight.Light,
-                    letterSpacing = (-.35).sp,
+                    fontSize = if (compact) 34.sp else 51.sp,
+                    lineHeight = if (compact) 36.sp else 53.sp,
+                    fontWeight = FontWeight.ExtraLight,
+                    letterSpacing = (-.55).sp,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -1190,24 +1263,28 @@ private fun CrystalMetadata(state: MediaUiState, compact: Boolean, modifier: Mod
                     Spacer(Modifier.height(if (compact) 8.dp else 12.dp))
                     Text(
                         it,
-                        color = PrimaryText.copy(alpha = .72f),
-                        fontSize = if (compact) 15.sp else 19.sp,
+                        color = PrimaryText.copy(alpha = .76f),
+                        fontSize = if (compact) 16.sp else 21.sp,
                         fontWeight = FontWeight.Light,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
                 track.album?.let {
-                    Spacer(Modifier.height(7.dp))
-                    Text(
-                        it.uppercase(),
-                        color = SecondaryText.copy(alpha = .72f),
-                        fontSize = if (compact) 8.sp else 9.sp,
-                        fontFamily = FontFamily.Monospace,
-                        letterSpacing = 1.5.sp,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
+                    Spacer(Modifier.height(if (compact) 9.dp else 12.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(Modifier.size(3.dp).clip(CircleShape).background(Accent.copy(alpha = .68f)))
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            it.uppercase(),
+                            color = SecondaryText.copy(alpha = .76f),
+                            fontSize = if (compact) 8.sp else 9.sp,
+                            fontFamily = FontFamily.Monospace,
+                            letterSpacing = 1.5.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
                 }
             }
         }
@@ -1952,18 +2029,30 @@ private fun AppearanceSelectionPanel(
         val wide = maxWidth >= 780.dp
         if (wide) {
             Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(22.dp)) {
-                Column(Modifier.weight(1.08f)) {
+                Column(
+                    Modifier
+                        .weight(1.08f)
+                        .fillMaxHeight()
+                        .verticalScroll(rememberScrollState()),
+                ) {
                     PanelIntro("DISPLAY DESIGN", "LAYOUT · TYPOGRAPHY · CONTROL LANGUAGE")
                     Spacer(Modifier.height(10.dp))
                     DesignPreviewGrid(selected = appearance.design, onSelect = onSelectDesign)
+                    Spacer(Modifier.height(12.dp))
                 }
                 Box(Modifier.fillMaxHeight().width(1.dp).background(SecondaryText.copy(alpha = .12f)))
-                Column(Modifier.weight(.92f)) {
+                Column(
+                    Modifier
+                        .weight(.92f)
+                        .fillMaxHeight()
+                        .verticalScroll(rememberScrollState()),
+                ) {
                     PanelIntro("COLOR SYSTEM", "CHOOSE LIGHT LEVEL, THEN COLOR FAMILY")
                     Spacer(Modifier.height(10.dp))
                     PaletteModeSelector(appearance.paletteMode, onSelectPaletteMode)
                     Spacer(Modifier.height(12.dp))
                     PalettePickerGrid(appearance.palette, appearance.paletteMode, onSelectPalette)
+                    Spacer(Modifier.height(12.dp))
                 }
             }
         } else {
@@ -2167,7 +2256,10 @@ private fun MotionSelectionPanel(
         if (wide) {
             Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(18.dp)) {
                 MotionOptionColumn(
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
+                        .verticalScroll(rememberScrollState()),
                     title = "TRACK TRANSITION",
                     subtitle = "CHANGEOVER BETWEEN COVERS",
                     preview = { ArtworkMotionPreview(previewMotion, motionPreviewId) },
@@ -2181,7 +2273,10 @@ private fun MotionSelectionPanel(
                     )
                 }
                 MotionOptionColumn(
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
+                        .verticalScroll(rememberScrollState()),
                     title = "AMBIENT PRESENCE",
                     subtitle = "VISUAL MOTION · NOT AUDIO REACTIVE",
                     preview = { PlaybackEffectPreview(appearance.playbackArtworkEffect) },
@@ -2245,6 +2340,7 @@ private fun MotionOptionColumn(
         preview()
         Spacer(Modifier.height(6.dp))
         options()
+        Spacer(Modifier.height(12.dp))
     }
 }
 
@@ -2792,22 +2888,26 @@ private fun Artwork(
     modifier: Modifier,
 ) {
     val playbackVisual = rememberPlaybackArtworkVisual(playbackEffect, state.isPlaying, state.positionMs)
-    val animatedModifier = if (design == DisplayDesign.MONOLITH_GLASS) {
-        modifier
-    } else {
-        modifier.graphicsLayer {
-            scaleX *= playbackVisual.scale
-            scaleY *= playbackVisual.scale
-            translationX = playbackVisual.translationX
-            translationY = playbackVisual.translationY
+    BoxWithConstraints(modifier, contentAlignment = Alignment.Center) {
+        val squareSize = minOf(maxWidth, maxHeight)
+        val squareModifier = Modifier.size(squareSize)
+        val animatedModifier = if (design == DisplayDesign.MONOLITH_GLASS) {
+            squareModifier
+        } else {
+            squareModifier.graphicsLayer {
+                scaleX *= playbackVisual.scale
+                scaleY *= playbackVisual.scale
+                translationX = playbackVisual.translationX
+                translationY = playbackVisual.translationY
+            }
         }
-    }
-    when (design.tokens.artworkTreatment) {
-        ArtworkTreatment.REFERENCE -> ReferenceArtwork(state, design, motion, pressed, controlCue, playbackVisual, animatedModifier)
-        ArtworkTreatment.STUDIO_DECK -> StudioArtworkDeck(state, design, motion, pressed, controlCue, playbackVisual, animatedModifier)
-        ArtworkTreatment.MONOLITH_GLASS -> MonolithGlassArtwork(state, design, motion, pressed, controlCue, playbackVisual, animatedModifier)
-        ArtworkTreatment.PRECISION_FRAME -> PrecisionFrameArtwork(state, design, motion, pressed, controlCue, playbackVisual, animatedModifier)
-        ArtworkTreatment.CRYSTAL_FLOAT -> CrystalFloatArtwork(state, design, motion, pressed, playbackVisual, animatedModifier)
+        when (design.tokens.artworkTreatment) {
+            ArtworkTreatment.REFERENCE -> ReferenceArtwork(state, design, motion, pressed, controlCue, playbackVisual, animatedModifier)
+            ArtworkTreatment.STUDIO_DECK -> StudioArtworkDeck(state, design, motion, pressed, controlCue, playbackVisual, animatedModifier)
+            ArtworkTreatment.MONOLITH_GLASS -> MonolithGlassArtwork(state, design, motion, pressed, controlCue, playbackVisual, animatedModifier)
+            ArtworkTreatment.PRECISION_FRAME -> PrecisionFrameArtwork(state, design, motion, pressed, controlCue, playbackVisual, animatedModifier)
+            ArtworkTreatment.CRYSTAL_FLOAT -> CrystalFloatArtwork(state, design, motion, pressed, playbackVisual, animatedModifier)
+        }
     }
 }
 
@@ -2896,28 +2996,16 @@ private fun StudioArtworkDeck(
         animationSpec = tween(110),
         label = "studio artwork touch",
     )
-    Column(
+    Box(
         modifier
             .clip(shape)
             .background(Surface.copy(alpha = .94f))
             .border(1.dp, if (playbackVisual.haloAlpha > 0f) Accent.copy(alpha = playbackVisual.haloAlpha) else frameColor, shape)
             .padding(12.dp),
     ) {
-        Row(Modifier.fillMaxWidth().height(18.dp), verticalAlignment = Alignment.Top) {
-            Text(
-                "MASTER SOURCE",
-                color = SecondaryText.copy(alpha = .72f),
-                fontSize = 7.sp,
-                fontFamily = FontFamily.Monospace,
-                letterSpacing = 1.4.sp,
-                modifier = Modifier.weight(1f),
-            )
-            Text("A / 01", color = Accent, fontSize = 7.sp, fontFamily = FontFamily.Monospace, letterSpacing = 1.sp)
-        }
         Box(
             Modifier
-                .weight(1f)
-                .fillMaxWidth()
+                .fillMaxSize()
                 .clip(RoundedCornerShape(1.dp))
                 .background(SurfaceRaised),
         ) {
@@ -2928,7 +3016,32 @@ private fun StudioArtworkDeck(
             if (pressed) Box(Modifier.fillMaxSize().background(Accent.copy(alpha = .025f)))
             ControlStateCue(controlCue, Modifier.align(Alignment.BottomCenter).padding(bottom = 12.dp))
         }
-        Row(Modifier.fillMaxWidth().height(24.dp), verticalAlignment = Alignment.Bottom) {
+        Row(
+            Modifier
+                .align(Alignment.TopCenter)
+                .fillMaxWidth()
+                .background(Brush.verticalGradient(listOf(Background.copy(alpha = .78f), Color.Transparent)))
+                .padding(horizontal = 10.dp, vertical = 9.dp),
+            verticalAlignment = Alignment.Top,
+        ) {
+            Text(
+                "MASTER SOURCE",
+                color = PrimaryText.copy(alpha = .82f),
+                fontSize = 7.sp,
+                fontFamily = FontFamily.Monospace,
+                letterSpacing = 1.4.sp,
+                modifier = Modifier.weight(1f),
+            )
+            Text("A / 01", color = Accent, fontSize = 7.sp, fontFamily = FontFamily.Monospace, letterSpacing = 1.sp)
+        }
+        Row(
+            Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth()
+                .background(Brush.verticalGradient(listOf(Color.Transparent, Background.copy(alpha = .86f))))
+                .padding(horizontal = 10.dp, vertical = 9.dp),
+            verticalAlignment = Alignment.Bottom,
+        ) {
             Box(
                 Modifier
                     .size(if (state.isPlaying) 5.dp + (2.dp * playbackVisual.haloAlpha) else 5.dp)
@@ -3084,44 +3197,72 @@ private fun CrystalFloatArtwork(
     modifier: Modifier,
 ) {
     val outerShape = RoundedCornerShape(design.tokens.artworkCornerRadius)
-    val innerShape = RoundedCornerShape(design.tokens.artworkCornerRadius - 5.dp)
+    val innerShape = RoundedCornerShape(design.tokens.artworkCornerRadius - 6.dp)
+    val edgeLight = if (pressed) .72f else maxOf(.28f, playbackVisual.haloAlpha * .86f)
+    val crystalPrimary = PrimaryText
+    val crystalAccent = Accent
     Box(
         modifier
             .clip(outerShape)
-            .background(Brush.linearGradient(listOf(PrimaryText.copy(alpha = .18f), Accent.copy(alpha = .055f), Surface.copy(alpha = .3f))))
-            .border(1.dp, PrimaryText.copy(alpha = maxOf(.22f, playbackVisual.haloAlpha)), outerShape)
-            .padding(5.dp),
+            .background(
+                Brush.linearGradient(
+                    colorStops = arrayOf(
+                        0f to PrimaryText.copy(alpha = .28f),
+                        .16f to PrimaryText.copy(alpha = .07f),
+                        .52f to Accent.copy(alpha = .075f),
+                        .82f to Surface.copy(alpha = .34f),
+                        1f to PrimaryText.copy(alpha = .14f),
+                    ),
+                ),
+            )
+            .border(1.dp, PrimaryText.copy(alpha = edgeLight), outerShape)
+            .padding(6.dp),
     ) {
         Box(
             Modifier
                 .fillMaxSize()
                 .clip(innerShape)
-                .background(SurfaceRaised.copy(alpha = .62f))
-                .border(1.dp, PrimaryText.copy(alpha = .1f), innerShape),
+                .background(SurfaceRaised.copy(alpha = .48f))
+                .border(1.dp, PrimaryText.copy(alpha = .12f), innerShape),
         ) {
             if (state.artwork != null) ArtworkVisual(state, motion) else CrystalArtworkFallback(state.sourceApp)
             Box(
                 Modifier
                     .fillMaxSize()
                     .background(
-                        Brush.linearGradient(
+                        Brush.verticalGradient(
                             colorStops = arrayOf(
-                                0f to PrimaryText.copy(alpha = .13f + playbackVisual.sheenAlpha),
-                                .24f to Color.Transparent,
-                                .78f to Color.Transparent,
-                                1f to Background.copy(alpha = .18f),
+                                0f to PrimaryText.copy(alpha = .045f + playbackVisual.sheenAlpha * .44f),
+                                .18f to Color.Transparent,
+                                .82f to Color.Transparent,
+                                1f to Background.copy(alpha = .075f),
                             ),
                         ),
                     ),
             )
+            Canvas(Modifier.fillMaxSize()) {
+                val corner = 26.dp.toPx()
+                val fine = 1.dp.toPx()
+                val primaryEdge = crystalPrimary.copy(alpha = .38f)
+                drawLine(primaryEdge, androidx.compose.ui.geometry.Offset.Zero, androidx.compose.ui.geometry.Offset(corner, 0f), fine)
+                drawLine(primaryEdge, androidx.compose.ui.geometry.Offset.Zero, androidx.compose.ui.geometry.Offset(0f, corner), fine)
+                drawLine(primaryEdge, androidx.compose.ui.geometry.Offset(size.width, size.height), androidx.compose.ui.geometry.Offset(size.width - corner, size.height), fine)
+                drawLine(primaryEdge, androidx.compose.ui.geometry.Offset(size.width, size.height), androidx.compose.ui.geometry.Offset(size.width, size.height - corner), fine)
+                drawLine(
+                    crystalAccent.copy(alpha = .13f + playbackVisual.sheenAlpha * .22f),
+                    androidx.compose.ui.geometry.Offset(size.width * .18f, 0f),
+                    androidx.compose.ui.geometry.Offset(size.width * .56f, size.height),
+                    fine,
+                )
+            }
             Box(
                 Modifier
                     .align(Alignment.TopCenter)
-                    .fillMaxWidth(.72f)
+                    .fillMaxWidth(.66f)
                     .height(1.dp)
-                    .background(Brush.horizontalGradient(listOf(Color.Transparent, PrimaryText.copy(alpha = (.64f + playbackVisual.sheenAlpha).coerceAtMost(.9f)), Color.Transparent))),
+                    .background(Brush.horizontalGradient(listOf(Color.Transparent, PrimaryText.copy(alpha = (.72f + playbackVisual.sheenAlpha).coerceAtMost(.94f)), Color.Transparent))),
             )
-            if (pressed) Box(Modifier.fillMaxSize().background(PrimaryText.copy(alpha = .07f)))
+            if (pressed) Box(Modifier.fillMaxSize().background(PrimaryText.copy(alpha = .055f)))
         }
     }
 }
